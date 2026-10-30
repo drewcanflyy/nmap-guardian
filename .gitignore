@@ -1,7 +1,7 @@
 __pycache__/
 .venv/
 data/
-nmap-*-setup.exe
+*.exe
 M111_Mini projets.pdf
 *.pyc
 .env

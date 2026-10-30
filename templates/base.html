@@ -21,6 +21,11 @@
     </nav>
   </header>
   <main id="main-content" class="page">{% block content %}{% endblock %}</main>
+  <section id="scan-progress" class="scan-progress" hidden role="status" aria-live="polite" aria-atomic="true">
+    <div class="scan-progress-head"><span>Estimated scan progress</span><strong data-scan-progress-value>0%</strong></div>
+    <div class="scan-progress-track" role="progressbar" aria-label="Estimated local scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-scan-progress-fill></span></div>
+    <p data-scan-progress-message>Preparing the local scanner…</p>
+  </section>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js" defer></script>
   <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>

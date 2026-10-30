@@ -2,19 +2,116 @@
 import { animate, inView, stagger } from "https://cdn.jsdelivr.net/npm/motion@14.8.0/+esm";
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const scanProgress = document.querySelector("#scan-progress");
+const scanProgressValue = document.querySelector("[data-scan-progress-value]");
+const scanProgressFill = document.querySelector("[data-scan-progress-fill]");
+const scanProgressMessage = document.querySelector("[data-scan-progress-message]");
+const scanProgressTrack = document.querySelector(".scan-progress-track");
 
-function setSubmittingState(form) {
+let progressTimer;
+
+function setScanProgress(value, message) {
+  const rounded = Math.max(0, Math.min(100, Math.round(value)));
+  if (scanProgressValue) scanProgressValue.textContent = `${rounded}%`;
+  if (scanProgressFill) scanProgressFill.style.width = `${rounded}%`;
+  if (scanProgressTrack) scanProgressTrack.setAttribute("aria-valuenow", String(rounded));
+  if (scanProgressMessage && message) scanProgressMessage.textContent = message;
+}
+
+function stageMessage(progress, mode) {
+  if (progress < 18) return "Preparing Nmap and checking localhost…";
+  if (progress < 52) return mode === "deep" ? "Checking local TCP ports…" : "Identifying common local services…";
+  if (progress < 83) return "Reading service information and process owners…";
+  return "Finishing the local scan…";
+}
+
+function beginScanProgress(mode) {
+  window.clearInterval(progressTimer);
+  if (!scanProgress) return;
+
+  const startedAt = performance.now();
+  // These values are deliberately estimates. Nmap does not expose a dependable
+  // percentage for every scan profile, so 100% is reserved for a real response.
+  const expectedMs = mode === "deep" ? 180000 : 18000;
+  scanProgress.hidden = false;
+  scanProgress.classList.remove("is-error");
+  setScanProgress(3, stageMessage(3, mode));
+
+  progressTimer = window.setInterval(() => {
+    const elapsed = performance.now() - startedAt;
+    const fraction = Math.min(1, elapsed / expectedMs);
+    // Reach 91% near the expected duration, then wait for the server response.
+    const progress = 3 + (88 * (1 - Math.pow(1 - fraction, 1.7)));
+    setScanProgress(Math.min(91, progress), stageMessage(progress, mode));
+  }, 260);
+}
+
+function completeScanProgress() {
+  window.clearInterval(progressTimer);
+  setScanProgress(100, "Scan complete — opening the new results…");
+}
+
+function failScanProgress(message) {
+  window.clearInterval(progressTimer);
+  if (scanProgress) scanProgress.classList.add("is-error");
+  setScanProgress(0, message);
+}
+
+function setSubmittingState(form, loadingText = "Inspecting localhost") {
   form.addEventListener("submit", () => {
     const button = form.querySelector("button[type='submit']");
     if (!button || button.disabled) return;
     button.disabled = true;
     button.classList.add("is-loading");
     const label = button.querySelector(".button-label");
-    if (label) label.textContent = "Inspecting localhost";
+    if (label) label.textContent = loadingText;
   });
 }
 
-document.querySelectorAll("form[action$='/scan']").forEach(setSubmittingState);
+document.querySelectorAll("[data-scan-form]").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submitter = event.submitter || form.querySelector("button[type='submit']");
+    const button = submitter || form.querySelector("button[type='submit']");
+    if (!button || button.disabled) return;
+    const buttons = [...form.querySelectorAll("button[type='submit']")];
+    const originalLabel = button.querySelector(".button-label")?.textContent;
+
+    const mode = submitter?.value || form.querySelector("[name='scan_mode']")?.value || "quick";
+    const formData = new FormData(form);
+    if (submitter?.name) formData.set(submitter.name, submitter.value);
+
+    buttons.forEach((item) => { item.disabled = true; });
+    button.classList.add("is-loading");
+    const label = button.querySelector(".button-label");
+    if (label) label.textContent = "Scanning localhost";
+    beginScanProgress(mode);
+
+    try {
+      const response = await fetch(form.action, { method: "POST", body: formData, redirect: "follow" });
+      if (!response.ok) {
+        window.location.assign(response.url);
+        return;
+      }
+      completeScanProgress();
+      window.setTimeout(() => window.location.assign(response.url), reduceMotion ? 0 : 360);
+    } catch {
+      failScanProgress("The scan request could not reach the local dashboard. Try again.");
+      buttons.forEach((item) => { item.disabled = false; });
+      button.classList.remove("is-loading");
+      if (label && originalLabel) label.textContent = originalLabel;
+    }
+  });
+});
+document.querySelectorAll("[data-remediation-form], .auto-remediation-form").forEach((form) => {
+  setSubmittingState(form, "Stopping + verifying");
+});
+document.querySelectorAll("[data-inspection-form]").forEach((form) => {
+  setSubmittingState(form, "Inspecting owner");
+});
+document.querySelectorAll("[data-python-audit-form]").forEach((form) => {
+  setSubmittingState(form, "Checking packages");
+});
 
 document.querySelectorAll("[data-copy-command]").forEach((button) => {
   button.addEventListener("click", async () => {

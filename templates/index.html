@@ -21,10 +21,11 @@
     </div>
     <h2 id="scan-control-title">Run a local inspection</h2>
     <p class="scan-version">{{ nmap_version }}</p>
-    <form class="scan-actions" method="post" action="{{ url_for('run_scan') }}">
+    <form class="scan-actions" method="post" action="{{ url_for('run_scan') }}" data-scan-form>
       <button class="primary scan-button" type="submit" name="scan_mode" value="quick" {% if not nmap_available %}disabled{% endif %}>
         <span class="button-label">Scan localhost</span><span class="button-arrow" aria-hidden="true">↗</span>
       </button>
+      <button class="secondary" type="submit" name="scan_mode" value="vuln" {% if not nmap_available %}disabled{% endif %}>CVE Vulnerability scan</button>
       <button class="secondary" type="submit" name="scan_mode" value="deep" {% if not nmap_available %}disabled{% endif %}>Deep scan all TCP ports</button>
     </form>
     <p class="microcopy"><span>Standard command</span><code>nmap -sV --version-light -oX - 127.0.0.1</code></p>
@@ -34,7 +35,7 @@
 
 <section class="notice safety-notice" data-reveal>
   <div class="notice-icon" aria-hidden="true">!</div>
-  <div><strong>Safety boundary</strong><span>This dashboard has no free-form targets, exploitation features, or automatic firewall and patch actions.</span></div>
+  <div><strong>Safety boundary</strong><span>The target is only localhost. Automatic cleanup is limited to verified Python or Node test servers on ports 3000, 8000, and 8080; Windows core services, firewall rules, and the dashboard itself remain protected.</span></div>
 </section>
 
 {% if latest %}
