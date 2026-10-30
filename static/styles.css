@@ -1621,6 +1621,34 @@ h3 {
 }
 .cmd-code--patch { color: #86d9b4; }
 
+.cmd--blocked {
+  border-color: var(--bad-line);
+  background: linear-gradient(90deg, rgba(242, 112, 138, 0.07), transparent 72%), var(--well);
+}
+.cmd-badge {
+  padding: 1px 7px;
+  border: 1px solid var(--bad-line);
+  border-radius: 999px;
+  background: var(--bad-dim);
+  color: #ffb3c1;
+  font-family: var(--mono);
+  font-size: 0.59rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.cmd-code--blocked {
+  color: var(--faint);
+  text-decoration: line-through;
+  text-decoration-color: rgba(242, 112, 138, 0.65);
+}
+.cmd-block-note {
+  margin-top: 2px;
+  color: #ffb3c1;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
 .inspect-form { margin-top: 10px; }
 
 /* ==========================================================================

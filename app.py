@@ -516,35 +516,127 @@ def exposure_score(services: list[dict]) -> dict:
     return {"value": score, "label": label, "counts": counts}
 
 
+def is_protected_process(port: int, owner: dict | None) -> bool:
+    """True when no stop/terminate action may ever be offered for this listener."""
+    if port == DASHBOARD_PORT:
+        return True
+    if not owner:
+        return False
+    process_name = str(owner.get("process", "")).lower()
+    try:
+        pid = int(owner.get("pid", 0))
+    except (TypeError, ValueError):
+        pid = 0
+    return pid <= 4 or pid == os.getpid() or process_name in WINDOWS_CORE_PROCESS_NAMES
+
+
+WINDOWS_SERVICE_NAMES = {
+    "msrpc",
+    "microsoft-ds",
+    "netbios-ssn",
+    "tcpwrapped",
+    "ms-wbt-server",
+    "ms-sql-s",
+    "epmap",
+}
+
+
+def is_windows_owned_service(port: int, service_name: str, owner: dict | None) -> bool:
+    """Recognize a Windows-owned listener so Linux service commands are not offered."""
+    process_name = str((owner or {}).get("process", "")).lower()
+    return (
+        port in WINDOWS_CORE_PORTS
+        or port == DASHBOARD_PORT
+        or process_name in WINDOWS_CORE_PROCESS_NAMES
+        or service_name in WINDOWS_SERVICE_NAMES
+    )
+
+
+def update_command_label(command: str) -> str:
+    lowered = command.lower()
+    windows_hints = ("winget", "windows", " kb", "powershell", "new-", "disable-", "set-itemproperty")
+    return "Windows · update" if any(hint in lowered for hint in windows_hints) else "Linux · update"
+
+
+def command_is_copyable(command: str) -> bool:
+    """Only offer Copy for a single executable command, never for prose or placeholders."""
+    if not command or "<" in command or " or " in command.lower():
+        return False
+    return bool(
+        re.match(
+            r"^(sudo|winget|apt|dnf|yum|systemctl|pip|python|npm|powershell|dism|"
+            r"New-|Get-|Set-|Stop-|Start-|Disable-|Enable-|Remove-|Restart-)",
+            command.strip(),
+            re.IGNORECASE,
+        )
+    )
+
+
 def remediation_plan(service: dict) -> dict:
     """Return local remediation guidance and, for a test server, a tightly scoped auto action."""
     port = int(service["port"])
     owner = service.get("owner")
     inspect = inspect_port_command(port)
     cve = service.get("cve")
+    service_name = str(service.get("service", "")).lower()
     process_name = str(owner.get("process", "")).lower() if owner else ""
     pid = int(owner["pid"]) if owner and owner.get("pid") else None
     can_auto_stop, eligibility_note = auto_stop_eligibility(port, owner)
 
-    # Windows commands
-    win_stop = f"Stop-Process -Id {pid}" if pid else None
+    protected = is_protected_process(port, owner)
+    windows_owned = is_windows_owned_service(port, service_name, owner)
+
+    # A stop command is offered only for a process that can be safely terminated.
+    win_stop = f"Stop-Process -Id {pid}" if pid and not protected else None
+    blocked_stop = f"Stop-Process -Id {pid}" if pid and protected else None
+    if protected:
+        if port == DASHBOARD_PORT:
+            stop_block = (
+                "This is the Nmap Guardian dashboard itself. Stopping it would end this session "
+                "and the verification scan."
+            )
+        else:
+            owner_name = str((owner or {}).get("process") or "a protected process")
+            stop_block = (
+                f"PID {pid} is owned by {owner_name}, a protected Windows process. "
+                "Terminating it can crash or destabilise Windows. Change the service or the "
+                "firewall policy instead."
+            )
+    else:
+        stop_block = None
+
     win_firewall = (
         f'New-NetFirewallRule -DisplayName "Nmap Guardian block TCP {port}" '
         f"-Direction Inbound -Protocol TCP -LocalPort {port} -Action Block"
     )
 
-    # Linux (sudo) cross-platform equivalents
-    linux_stop = f"sudo fuser -k {port}/tcp" if port in DEVELOPMENT_PORTS else f"sudo systemctl stop {service.get('service', 'service-name')}"
-    linux_firewall = f"sudo ufw deny {port}/tcp"
-    update_cmd = (cve or {}).get("update_cmd") or (cve or {}).get("linux_cmd") or f"sudo apt update && sudo apt --only-upgrade install {service.get('service', 'package')}"
+    # Linux guidance only makes sense for a service that can exist on Linux.
+    if windows_owned:
+        linux_stop = None
+        linux_firewall = None
+    else:
+        linux_stop = (
+            f"sudo fuser -k {port}/tcp"
+            if port in DEVELOPMENT_PORTS
+            else f"sudo systemctl stop {service.get('service', 'service-name')}"
+        )
+        linux_firewall = f"sudo ufw deny {port}/tcp"
+
+    update_cmd = (cve or {}).get("update_cmd") or (cve or {}).get("linux_cmd") or (
+        f"sudo apt update && sudo apt --only-upgrade install {service.get('service', 'package')}"
+    )
 
     plan = {
         "inspect": inspect,
         "stop": win_stop,
+        "blocked_stop": blocked_stop,
+        "stop_block": stop_block,
         "firewall": win_firewall,
         "linux_stop": linux_stop,
         "linux_firewall": linux_firewall,
         "update_cmd": update_cmd,
+        "update_label": update_command_label(update_cmd),
+        "update_copyable": command_is_copyable(update_cmd),
         "auto_stop": can_auto_stop,
         "cve": cve,
         "notice": "Review the command before running. Use an elevated PowerShell window on Windows, or sudo on Linux.",

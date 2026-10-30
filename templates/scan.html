@@ -274,8 +274,10 @@
               {% if service.cve and service.remediation.update_cmd %}
               <div class="cmd">
                 <div class="cmd-head">
-                  <span class="cmd-label env-linux">Linux · update</span>
+                  <span class="cmd-label {% if 'Windows' in service.remediation.update_label %}env-win{% else %}env-linux{% endif %}">{{ service.remediation.update_label }}</span>
+                  {% if service.remediation.update_copyable %}
                   <button type="button" class="cmd-copy" data-copy-command="{{ service.remediation.update_cmd }}">Copy</button>
+                  {% endif %}
                 </div>
                 <code class="cmd-code cmd-code--patch">{{ service.remediation.update_cmd }}</code>
               </div>
@@ -288,6 +290,15 @@
                   <button type="button" class="cmd-copy" data-copy-command="{{ service.remediation.stop }}">Copy</button>
                 </div>
                 <code class="cmd-code">{{ service.remediation.stop }}</code>
+              </div>
+              {% elif service.remediation.blocked_stop %}
+              <div class="cmd cmd--blocked">
+                <div class="cmd-head">
+                  <span class="cmd-label env-win">PowerShell · stop process</span>
+                  <span class="cmd-badge">Not recommended</span>
+                </div>
+                <code class="cmd-code cmd-code--blocked">{{ service.remediation.blocked_stop }}</code>
+                <p class="cmd-block-note">{{ service.remediation.stop_block }}</p>
               </div>
               {% endif %}
 
