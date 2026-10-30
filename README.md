@@ -11,6 +11,7 @@ Nmap Guardian is a local-only Flask dashboard for the **Cartographie et services
 - Nmap XML parsing with service and version details when available.
 - Good, Review, and Danger findings with explainable rules and a direct per-port decision (keep, close after test, protect, or investigate).
 - Approved-port baseline management.
+- Operator-declared firewall mitigations: record a block for a port, and the next scan marks it **Restricted (declared)**, never Good, until you remove the declaration.
 - Exposure score and scan-to-scan change tracking.
 - Windows process and PID association for detected local listening ports.
 - Copyable PowerShell command plans, a one-click read-only **Inspect in PowerShell** owner/service check, and stop-and-verify for a verified Python/Node test server on ports 3000, 8000, or 8080.
@@ -25,6 +26,8 @@ Nmap Guardian is a local-only Flask dashboard for the **Cartographie et services
 ![Findings with the remediation drawer open](docs/screenshots/scan-drawer.png)
 
 ![Action plan at the top of a scan result](docs/screenshots/action-plan.png)
+
+![A declared firewall mitigation shown as Restricted, not Good](docs/screenshots/mitigation.png)
 
 ![Scan page on a 390 px viewport](docs/screenshots/scan-mobile.png)
 

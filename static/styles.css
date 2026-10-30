@@ -1061,6 +1061,8 @@ h3 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 22px;
 }
+.plan-body--single { grid-template-columns: minmax(0, 1fr); }
+.plan-body--single .plan-list { max-width: 720px; }
 
 .plan-group h3,
 .plan-never h3 {
@@ -1156,6 +1158,81 @@ h3 {
   font-family: var(--mono);
   font-size: 0.72rem;
 }
+
+/* Declared mitigations */
+.mitigation-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.61rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mitigation-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-sm);
+  background: linear-gradient(90deg, var(--accent-dim), transparent 72%);
+}
+.mitigation-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.mitigation-date { color: var(--faint); font-family: var(--mono); font-size: 0.66rem; }
+.mitigation-note-text { color: var(--ink-2); font-size: 0.78rem; }
+.mitigation-caveat {
+  margin-top: 4px;
+  color: var(--faint);
+  font-size: 0.71rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.mitigation-form {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.mitigation-hint {
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.mitigation-field { display: grid; gap: 4px; width: 100%; }
+.mitigation-field span {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.mitigation-field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--well);
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+.mitigation-field input::placeholder { color: var(--faint); }
 
 /* ==========================================================================
    Result consoles (PowerShell, Python audit, Windows updates, remediation)

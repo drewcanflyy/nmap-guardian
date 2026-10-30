@@ -23,6 +23,7 @@ APP_ROOT = Path(__file__).resolve().parent
 DATA_DIR = APP_ROOT / "data"
 HISTORY_FILE = DATA_DIR / "scan_history.json"
 BASELINE_FILE = APP_ROOT / "baseline.json"
+MITIGATIONS_FILE = DATA_DIR / "mitigations.json"
 LOCAL_TARGET = "127.0.0.1"
 SCAN_PROFILES = {
     "quick": {
@@ -78,6 +79,12 @@ def save_json(path: Path, value) -> None:
 
 def find_nmap() -> str | None:
     return shutil.which("nmap") or shutil.which("nmap.exe")
+
+
+def load_mitigations() -> dict[str, dict]:
+    """Read operator-declared mitigations, keyed by port number as text."""
+    data = load_json(MITIGATIONS_FILE, {})
+    return data if isinstance(data, dict) else {}
 
 
 def find_powershell() -> str | None:
@@ -838,17 +845,47 @@ def run_windows_update_status() -> tuple[dict, str | None]:
     return status, None
 
 
-def enrich_services(services: list[dict], listeners: dict[int, dict] | None = None) -> list[dict]:
+def restricted_guidance(service: dict, mitigation: dict) -> dict:
+    """Describe a declared firewall mitigation without pretending the port is closed."""
+    note = str(mitigation.get("note") or "Firewall restriction declared by the operator.")
+    declared_at = str(mitigation.get("declared_at") or "an earlier scan")
+    return {
+        "level": "Review",
+        "reason": (
+            f"Inbound access is declared restricted: {note}. The listener remains, and this "
+            "scan cannot read the firewall, so confirm remote reachability from another host."
+        ),
+        "action": "Keep the firewall rule enabled on every profile and verify from another host. Do not stop a service Windows needs.",
+        "decision": decision(
+            "Restricted (declared)",
+            "protect",
+            f"Mitigation recorded on {declared_at}: {note}",
+            [
+                "Keep the firewall rule enabled on Domain, Private, and Public profiles.",
+                "Verify from another host that the port is filtered, not open.",
+                "Remove the declaration if the rule is ever removed.",
+            ],
+        ),
+    }
+
+
+def enrich_services(services: list[dict], listeners: dict[int, dict] | None = None, mitigations: dict[str, dict] | None = None) -> list[dict]:
     baseline = load_json(BASELINE_FILE, {"approved_ports": []})
     approved_ports = {int(port) for port in baseline.get("approved_ports", [])}
     listeners = listeners or {}
+    mitigations = mitigations or {}
     enriched = []
     for service in services:
         owner = listeners.get(service["port"])
         cve = correlate_cve(service)
         if cve:
             service["cve"] = cve
-        enriched_service = {**service, **risk_for(service, approved_ports, owner)}
+        guidance = risk_for(service, approved_ports, owner)
+        mitigation = mitigations.get(str(service["port"]))
+        if mitigation and guidance["level"] == "Danger":
+            guidance = restricted_guidance(service, mitigation)
+            service["mitigation"] = mitigation
+        enriched_service = {**service, **guidance}
         if owner:
             enriched_service["owner"] = owner
         enriched_service["remediation"] = remediation_plan(enriched_service)
@@ -876,7 +913,7 @@ def scan_localhost(profile_name: str = "quick") -> dict:
     if not result.stdout.strip():
         raise RuntimeError(result.stderr.strip() or "Nmap did not return XML output.")
     try:
-        services = enrich_services(parse_nmap_xml(result.stdout), local_listeners())
+        services = enrich_services(parse_nmap_xml(result.stdout), local_listeners(), load_mitigations())
     except ET.ParseError as error:
         raise RuntimeError("Nmap returned output that could not be parsed as XML.") from error
 
@@ -914,7 +951,10 @@ def scan_history() -> list[dict]:
             # Recommendations are recalculated at display time so policy and copy
             # changes apply consistently; the stored classification stays as evidence.
             current_guidance = risk_for(service, approved_ports, service.get("owner"))
-            service["decision"] = current_guidance["decision"]
+            if service.get("mitigation"):
+                service["decision"] = restricted_guidance(service, service["mitigation"])["decision"]
+            else:
+                service["decision"] = current_guidance["decision"]
             # Plans are calculated at display time so outdated scans cannot keep
             # showing an unsafe action after the policy has changed.
             service["remediation"] = remediation_plan(service)
@@ -945,6 +985,11 @@ def save_scan(scan: dict) -> dict:
     history.insert(0, scan)
     save_json(HISTORY_FILE, history[:20])
     return scan
+
+
+@app.context_processor
+def inject_mitigations():
+    return {"mitigations": load_mitigations()}
 
 
 @app.get("/")
@@ -1021,6 +1066,58 @@ def remediate_test_process(scan_id: str, port: int):
         "command": command,
         "message": "Verified local test process stopped. This is a new scan, not a live update of the earlier result.",
     }
+    save_scan(verification)
+    return redirect(url_for("scan_detail", scan_id=verification["id"]))
+
+
+@app.post("/scan/<scan_id>/mitigate/<int:port>")
+def record_mitigation(scan_id: str, port: int):
+    """Record an operator-declared firewall mitigation, then verify with a new scan."""
+    source_scan = find_scan(scan_id)
+    if not source_scan:
+        abort(404)
+
+    note = (request.form.get("note") or "").strip()[:180]
+    mitigations = load_mitigations()
+    mitigations[str(port)] = {
+        "note": note or "Firewall restriction declared by the operator.",
+        "declared_at": iso_now(),
+    }
+    save_json(MITIGATIONS_FILE, mitigations)
+
+    try:
+        verification = scan_localhost(source_scan.get("scan_mode", "quick"))
+    except RuntimeError as error:
+        return render_template(
+            "error.html",
+            message=f"The mitigation was recorded, but the verification scan could not run: {error}",
+        ), 500
+
+    verification["mitigation_result"] = {"port": port, "note": mitigations[str(port)]["note"]}
+    save_scan(verification)
+    return redirect(url_for("scan_detail", scan_id=verification["id"]))
+
+
+@app.post("/scan/<scan_id>/unmitigate/<int:port>")
+def remove_mitigation(scan_id: str, port: int):
+    """Remove an operator-declared mitigation, then verify with a new scan."""
+    scan = find_scan(scan_id)
+    if not scan:
+        abort(404)
+
+    mitigations = load_mitigations()
+    mitigations.pop(str(port), None)
+    save_json(MITIGATIONS_FILE, mitigations)
+
+    try:
+        verification = scan_localhost(scan.get("scan_mode", "quick"))
+    except RuntimeError as error:
+        return render_template(
+            "error.html",
+            message=f"The declaration was removed, but the verification scan could not run: {error}",
+        ), 500
+
+    verification["mitigation_removed"] = {"port": port}
     save_scan(verification)
     return redirect(url_for("scan_detail", scan_id=verification["id"]))
 

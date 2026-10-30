@@ -52,7 +52,7 @@
   </div>
 
   {% if plan.act or plan.decide %}
-  <div class="plan-body">
+  <div class="plan-body{% if not plan.act %} plan-body--single{% endif %}">
     {% if plan.act %}
     <div class="plan-group">
       <h3>Act now</h3>
@@ -210,6 +210,26 @@
 </section>
 {% endif %}
 
+{% if scan.get('mitigation_result') %}
+<section class="remediation-result" data-reveal>
+  <span class="remediation-status">Declared</span>
+  <div>
+    <strong>Port {{ scan.mitigation_result.port }} mitigation recorded.</strong>
+    <p>{{ scan.mitigation_result.note }} A new scan was created and classifies this finding as Restricted (declared), not Good.</p>
+  </div>
+</section>
+{% endif %}
+
+{% if scan.get('mitigation_removed') %}
+<section class="remediation-result" data-reveal>
+  <span class="remediation-status">Removed</span>
+  <div>
+    <strong>Port {{ scan.mitigation_removed.port }} declaration removed.</strong>
+    <p>A new scan was created so the finding reflects the current state.</p>
+  </div>
+</section>
+{% endif %}
+
 {% set changes = scan.get('changes', {}) %}
 {% if changes.get('previous_scan') %}
 <section class="compare" data-reveal aria-label="Changes since the previous scan">
@@ -284,6 +304,9 @@
 
       <div class="finding-tags">
         <span class="status-pill status-pill--{{ level }}">{{ service.level }}</span>
+        {% if service.mitigation %}
+        <span class="mitigation-pill" title="Declared mitigation, not verified by this scan">Mitigated</span>
+        {% endif %}
         {% if service.decision %}
         <span class="next-pill" title="Recommended next step">{{ service.decision.label }}</span>
         {% endif %}
@@ -340,6 +363,30 @@
 
             {% if service.owner and service.owner.services %}
             <p class="owner-detail">Windows service: <code>{{ service.owner.services }}</code></p>
+            {% endif %}
+
+            {% if service.mitigation %}
+            <div class="mitigation-box">
+              <div class="mitigation-box-head">
+                <span class="mitigation-pill">Mitigated (declared)</span>
+                <span class="mitigation-date">{{ service.mitigation.declared_at }}</span>
+              </div>
+              <p class="mitigation-note-text">{{ service.mitigation.note }}</p>
+              <p class="mitigation-caveat">This scan did not read the firewall. Verify remote reachability from another host.</p>
+              <form method="post" action="{{ url_for('remove_mitigation', scan_id=scan.id, port=service.port) }}">
+                <button class="chip-button" type="submit">Remove declaration</button>
+              </form>
+            </div>
+            {% elif service.level != 'Good' and (service.port|string) not in mitigations %}
+            <form class="mitigation-form" method="post" action="{{ url_for('record_mitigation', scan_id=scan.id, port=service.port) }}" data-mitigation-form>
+              <span class="drawer-kicker">Record a mitigation</span>
+              <p class="mitigation-hint">Blocked this port at the firewall? Record it here. The dashboard creates a new scan and marks the finding Restricted (declared), never Good.</p>
+              <label class="mitigation-field">
+                <span>Evidence</span>
+                <input type="text" name="note" maxlength="180" placeholder="Firewall rule: Nmap Guardian block TCP {{ service.port }}">
+              </label>
+              <button class="btn btn-ghost btn-sm" type="submit"><span class="button-label">Record and rescan</span></button>
+            </form>
             {% endif %}
           </div>
 

@@ -146,6 +146,13 @@ document.querySelectorAll("[data-stop-form]").forEach((form) => {
   });
 });
 
+document.querySelectorAll("[data-mitigation-form]").forEach((form) => {
+  form.addEventListener("submit", () => {
+    busy(form.querySelector("button[type='submit']"), "Recording");
+    beginScan("quick", "Recording the declared mitigation, then scanning again.");
+  });
+});
+
 /* --------------------------------------------------------------------------
    Findings drawers
    -------------------------------------------------------------------------- */

@@ -1,5 +1,7 @@
 {
-  "approved_ports": [],
-  "updated_at": "2026-10-30T14:32:35+01:00",
+  "approved_ports": [
+    445
+  ],
+  "updated_at": "2026-10-30T18:55:58+01:00",
   "note": "Approved locally in Nmap Guardian."
 }
