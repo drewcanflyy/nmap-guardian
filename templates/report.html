@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Nmap Guardian report {{ scan.id }}{% endblock %}
+{% block content %}
+<section class="report-head"><p class="eyebrow">Nmap Guardian evidence report</p><h1>Authorized localhost exposure assessment</h1><p>Scan {{ scan.id }} · {{ scan.timestamp }} · {{ scan.target }}</p><p><strong>{{ scan.scan_label }}</strong> - {{ scan.scan_scope }}</p></section>
+<section class="notice"><strong>Scope</strong><span>This report covers only the local target 127.0.0.1. It does not assess the institution network or prove that a service is vulnerable.</span></section>
+<section class="report-score"><strong>Exposure score: {{ scan.score.value }}/100</strong><span>{{ scan.score.label }}. Formula: minus 12 per Review and minus 35 per Danger finding.</span></section>
+<h2>Service inventory</h2>
+<table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Level</th><th>Reason</th><th>Recommended action</th></tr></thead><tbody>
+{% for service in scan.services %}<tr><td>{{ service.port }}</td><td>{{ service.protocol }}</td><td>{{ service.service }}<br><small>{{ service.details }}</small></td><td>{{ service.level }}</td><td>{{ service.reason }}</td><td>{{ service.action }}</td></tr>{% endfor %}
+{% if not scan.services %}<tr><td colspan="6">No open TCP services detected.</td></tr>{% endif %}
+</tbody></table>
+<h2>Method</h2><p><code>{{ scan.command }}</code></p><p>{{ scan.nmap_version }}</p>
+<p class="print-note">Use your browser's print command to save this report as PDF.</p>
+{% endblock %}

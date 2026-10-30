@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Scan {{ scan.id }} | Nmap Guardian{% endblock %}
+{% block body_class %}scan-page{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('index') }}"><span aria-hidden="true">←</span> Dashboard</a>
+<section class="result-head" data-intro>
+  <div>
+    <p class="eyebrow">Inspection {{ scan.id }}</p>
+    <h1>Local exposure inventory.</h1>
+    <p class="lede">{{ scan.timestamp }} <span aria-hidden="true">/</span> Target {{ scan.target }}</p>
+    <p class="scan-profile"><span>{{ scan.scan_label }}</span>{{ scan.scan_scope }}</p>
+  </div>
+  <div class="actions" data-intro-card>
+    <a class="secondary" href="{{ url_for('report', scan_id=scan.id) }}" target="_blank">Printable report <span aria-hidden="true">↗</span></a>
+    <form method="post" action="{{ url_for('run_scan') }}"><input type="hidden" name="scan_mode" value="{{ scan.scan_mode }}"><button class="primary scan-button" type="submit"><span class="button-label">Rescan localhost</span><span class="button-arrow" aria-hidden="true">↗</span></button></form>
+  </div>
+</section>
+
+{% set changes = scan.get('changes', {}) %}
+{% if changes.get('previous_scan') %}
+<section class="comparison" data-reveal>
+  <div class="change-open"><span>Newly open</span><strong>{% if changes.opened %}{{ changes.opened|join(', ') }}{% else %}None{% endif %}</strong></div>
+  <div class="change-closed"><span>Newly closed</span><strong>{% if changes.closed %}{{ changes.closed|join(', ') }}{% else %}None{% endif %}</strong></div>
+  <div><span>Compared with</span><strong>{{ changes.previous_scan.timestamp }}</strong></div>
+</section>
+{% endif %}
+
+<section class="scan-status-panel" data-reveal>
+  <div class="score-orbit score-orbit-small" style="--score: {{ scan.score.value }}" role="img" aria-label="Exposure score {{ scan.score.value }} out of 100"><div class="score-core"><span>Score</span><strong>{{ scan.score.value }}</strong><small>/100</small></div></div>
+  <div><p class="panel-kicker">Exposure priority</p><h2>{{ scan.score.label }}</h2><p>Minus 12 points per Review finding and 35 points per Danger finding. This is a prioritization aid, not a vulnerability verdict.</p></div>
+  <div class="score-counts"><span>Good <strong>{{ scan.score.counts.Good }}</strong></span><span>Review <strong>{{ scan.score.counts.Review }}</strong></span><span>Danger <strong>{{ scan.score.counts.Danger }}</strong></span></div>
+</section>
+<section class="section-heading services-heading" data-reveal><div><p class="eyebrow">Observed services</p><h2>{{ scan.services|length }} open service(s)</h2></div></section>
+{% if scan.services %}
+<div class="finding-list" data-motion-list>
+  {% for service in scan.services %}
+  <article class="finding finding-{{ service.level|lower }}" data-motion-item>
+    <div class="port-block"><span>{{ service.protocol }}</span><strong>{{ service.port }}</strong></div>
+    <div class="service-block"><span class="finding-label">Service</span><h3>{{ service.service }}</h3><p>{{ service.details }}</p></div>
+    <div class="reason"><span class="badge badge-{{ service.level|lower }}">{{ service.level }}</span><p>{{ service.reason }}</p></div>
+    <div class="action">
+      <span>Recommended next step</span><p>{{ service.action }}</p>
+      {% if service.owner %}<p class="process-owner">Owner: <strong>{{ service.owner.process }}</strong> <code>PID {{ service.owner.pid }}</code> on {{ service.owner.address }}</p>{% endif %}
+      {% if service.remediation %}
+      <details class="command-plan">
+        <summary>Manual command plan</summary>
+        <p>{{ service.remediation.notice }}</p>
+        <div class="command-row"><div><span>Inspect owner</span><code>{{ service.remediation.inspect }}</code></div><button type="button" class="copy-command" data-copy-command="{{ service.remediation.inspect }}">Copy</button></div>
+        {% if service.remediation.stop %}<div class="command-row"><div><span>Stop this development process</span><code>{{ service.remediation.stop }}</code></div><button type="button" class="copy-command" data-copy-command="{{ service.remediation.stop }}">Copy</button></div>{% endif %}
+        {% if service.remediation.firewall %}<div class="command-row"><div><span>Block inbound TCP traffic</span><code>{{ service.remediation.firewall }}</code></div><button type="button" class="copy-command" data-copy-command="{{ service.remediation.firewall }}">Copy</button></div>{% endif %}
+      </details>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<section class="empty-state"><h2>No open TCP services detected.</h2><p>This is a useful baseline. Start the controlled local Python server and scan again to produce before/after evidence.</p></section>
+{% endif %}
+
+{% if scan.services %}
+<section class="baseline-editor" data-reveal>
+  <div><p class="eyebrow">Baseline management</p><h2>Approve expected local services.</h2><p>Select only ports you understand and expect to remain open. The next scan will classify them as Good.</p></div>
+  <form method="post" action="{{ url_for('update_baseline') }}">
+    <input type="hidden" name="source_scan" value="{{ scan.id }}">
+    <div class="port-checkboxes">
+    {% for service in scan.services %}
+      <label><input type="checkbox" name="approved_ports" value="{{ service.port }}" {% if service.port in baseline.approved_ports %}checked{% endif %}><span>{{ service.port }}</span> {{ service.service }}</label>
+    {% endfor %}
+    </div>
+    <button class="secondary" type="submit">Save reviewed baseline</button>
+  </form>
+</section>
+{% endif %}
+
+<section class="technical-details">
+  <h2>Reproducibility details</h2>
+  <p><strong>Command:</strong> <code>{{ scan.command }}</code></p>
+  <p><strong>Scanner:</strong> {{ scan.nmap_version }}</p>
+  <details><summary>Raw Nmap XML evidence</summary><pre>{{ scan.raw_xml }}</pre></details>
+</section>
+{% endblock %}

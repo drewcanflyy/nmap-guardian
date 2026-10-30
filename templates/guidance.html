@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Remediation guide | Nmap Guardian{% endblock %}
+{% block content %}
+<section class="guide-head"><p class="eyebrow">Manual remediation guide</p><h1>Understand the service before changing the machine.</h1><p class="lede">Nmap Guardian does not automatically patch software, stop services, or alter firewall rules. It gives reviewed local steps that you can demonstrate and verify.</p></section>
+<section class="guide-grid">
+  <article><span class="guide-number">01</span><h2>Identify</h2><p>Record the port, service name, version information, owner, and whether it is expected. An open port is an observation, not automatic proof of a vulnerability.</p></article>
+  <article><span class="guide-number">02</span><h2>Reduce exposure</h2><p>For a temporary development server, stop it after testing. Where supported, configure it to bind to <code>127.0.0.1</code> instead of all network interfaces.</p></article>
+  <article><span class="guide-number">03</span><h2>Verify</h2><p>Run a new localhost scan. Keep the before/after results and explain whether the target port is now closed or still needed.</p></article>
+</section>
+<section class="command-guide"><p class="eyebrow">Controlled course demo</p><h2>Python web-server example</h2><ol><li>Start a local-only web service: <code>python -m http.server 8000 --bind 127.0.0.1</code></li><li>Scan it in Nmap Guardian and document port 8000.</li><li>Stop the test service with <code>Ctrl+C</code> in the terminal that started it.</li><li>Use <strong>Rescan localhost</strong> and document that port 8000 is closed.</li></ol><p class="muted">For Windows Firewall or other system services, use operating-system documentation and make changes only when you are the authorized administrator. Record the action before rescanning.</p></section>
+{% endblock %}

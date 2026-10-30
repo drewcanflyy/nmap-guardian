@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="error-state"><p class="eyebrow">Scan unavailable</p><h1>Could not complete the localhost scan.</h1><p>{{ message }}</p><a class="secondary" href="{{ url_for('index') }}">Return to dashboard</a></section>
+{% endblock %}

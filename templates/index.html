@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block content %}
+<section class="dashboard-hero" data-intro>
+  <div class="hero-copy">
+    <p class="eyebrow">Local exposure monitor</p>
+    <h1>Know what your machine is <span>showing.</span></h1>
+    <p class="lede">An authorized, local-first workflow to inspect services, reduce unnecessary exposure, and keep evidence of every change.</p>
+    <div class="hero-facts" aria-label="Dashboard scope">
+      <span>Target <strong>127.0.0.1</strong></span>
+      <span>Mode <strong>Service inventory</strong></span>
+    </div>
+  </div>
+  <section class="scan-panel scan-command" aria-labelledby="scan-control-title" data-intro-card>
+    <div class="scan-panel-head">
+      <div>
+        <span class="status-indicator {% if nmap_available %}is-ready{% else %}is-unavailable{% endif %}" aria-hidden="true"></span>
+        <p class="panel-kicker">Scanner status</p>
+      </div>
+      <span class="scanner-state {% if nmap_available %}status-good{% else %}status-danger{% endif %}">{% if nmap_available %}Online{% else %}Unavailable{% endif %}</span>
+    </div>
+    <h2 id="scan-control-title">Run a local inspection</h2>
+    <p class="scan-version">{{ nmap_version }}</p>
+    <form class="scan-actions" method="post" action="{{ url_for('run_scan') }}">
+      <button class="primary scan-button" type="submit" name="scan_mode" value="quick" {% if not nmap_available %}disabled{% endif %}>
+        <span class="button-label">Scan localhost</span><span class="button-arrow" aria-hidden="true">↗</span>
+      </button>
+      <button class="secondary" type="submit" name="scan_mode" value="deep" {% if not nmap_available %}disabled{% endif %}>Deep scan all TCP ports</button>
+    </form>
+    <p class="microcopy"><span>Standard command</span><code>nmap -sV --version-light -oX - 127.0.0.1</code></p>
+    <p class="deep-scan-note">The deep option checks all local TCP ports. It can take up to four minutes. UDP is intentionally outside this local coursework scope.</p>
+  </section>
+</section>
+
+<section class="notice safety-notice" data-reveal>
+  <div class="notice-icon" aria-hidden="true">!</div>
+  <div><strong>Safety boundary</strong><span>This dashboard has no free-form targets, exploitation features, or automatic firewall and patch actions.</span></div>
+</section>
+
+{% if latest %}
+<section class="section-heading latest-heading" data-reveal>
+  <div><p class="eyebrow">Current posture</p><h2>Latest inspection</h2><p class="section-copy">Captured {{ latest.timestamp }} for {{ latest.target }}.</p></div>
+  <a class="text-link arrow-link" href="{{ url_for('scan_detail', scan_id=latest.id) }}">Open scan <span aria-hidden="true">↗</span></a>
+</section>
+<section class="posture-grid" data-reveal>
+  <div class="score-orbit" style="--score: {{ latest.score.value }}" role="img" aria-label="Exposure score {{ latest.score.value }} out of 100, {{ latest.score.label }}">
+    <div class="score-core"><span>Exposure</span><strong>{{ latest.score.value }}</strong><small>/100</small></div>
+  </div>
+  <div class="posture-summary">
+    <p class="panel-kicker">{{ latest.score.label }}</p>
+    <h3>Exposure is measured by the open services you have not approved.</h3>
+    <p>Review findings reduce the score by 12 points. Danger findings reduce it by 35 points.</p>
+  </div>
+  <div class="metric-rail">
+    <article class="metric"><span>Visible</span><strong>{{ latest.services|length }}</strong><small>open services</small></article>
+    <article class="metric metric-danger"><span>Danger</span><strong>{{ latest.services|selectattr('level', 'equalto', 'Danger')|list|length }}</strong><small>need review</small></article>
+    <article class="metric metric-review"><span>Review</span><strong>{{ latest.services|selectattr('level', 'equalto', 'Review')|list|length }}</strong><small>unapproved</small></article>
+  </div>
+</section>
+{% else %}
+<section class="empty-state empty-state-feature" data-reveal>
+  <p class="eyebrow">No evidence yet</p>
+  <h2>Run the first local inspection.</h2>
+  <p>Start a controlled service with <code>python -m http.server 8000 --bind 127.0.0.1</code>, then scan it to create your first evidence record.</p>
+</section>
+{% endif %}
+
+<section class="baseline-summary" data-reveal>
+  <div class="baseline-count"><span>Approved</span><strong>{{ baseline.approved_ports|length }}</strong><small>ports</small></div>
+  <div><h2>Baseline is your reference, not an automatic approval.</h2><p>Only expected services should enter it. Revisit the baseline when the machine changes.</p></div>
+  <a class="secondary" href="{{ url_for('guidance') }}">Open playbook <span aria-hidden="true">↗</span></a>
+</section>
+
+{% if history %}
+<section class="section-heading history-heading" data-reveal><div><p class="eyebrow">Evidence trail</p><h2>Saved inspections</h2></div></section>
+<div class="history-list" data-reveal>
+  {% for item in history %}
+  <a href="{{ url_for('scan_detail', scan_id=item.id) }}" class="history-row">
+    <span class="history-id">{{ item.id }}</span><span>{{ item.timestamp }}</span><span>{{ item.services|length }} service(s)</span><span class="history-arrow" aria-hidden="true">↗</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
