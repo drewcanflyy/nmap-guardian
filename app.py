@@ -450,7 +450,7 @@ def risk_for(service: dict, approved_ports: set[int], owner: dict | None = None)
             "reason": "This listener is owned by a protected Windows process, so killing the PID is not a safe remediation.",
             "action": "Inspect the owner and related Windows service first. Change it only through the documented application or Windows service settings.",
             "decision": decision(
-                "Investigate — do not kill",
+                "Investigate, do not kill",
                 "investigate",
                 "Windows owns this listener. First identify the related service; do not close it by terminating the process.",
                 ["Use Inspect in PowerShell to record the PID and any service names.", "Look up the service in Windows Services before changing its startup or firewall policy.", "Rescan only after an authorised configuration change."],
@@ -504,6 +504,45 @@ def risk_for(service: dict, approved_ports: set[int], owner: dict | None = None)
             ["Inspect the process owner and service name.", "Keep it only if you recognize and need it; otherwise stop it from its own application settings.", "Add it to the baseline only after you make that decision."],
         ),
     }
+
+
+def action_plan(services: list[dict]) -> dict:
+    """Turn findings into a short plan: act now, review, keep, and never run."""
+    act: list[dict] = []
+    decide: list[dict] = []
+    keep: list[dict] = []
+    never: dict[str, dict] = {}
+
+    for service in services:
+        decision = service.get("decision") or {}
+        entry = {
+            "port": int(service["port"]),
+            "service": service.get("service", "unknown"),
+            "level": service.get("level", "Review"),
+            "label": decision.get("label") or "Review this listener",
+            "action": service.get("action") or decision.get("summary") or "",
+        }
+        if entry["level"] == "Danger":
+            act.append(entry)
+        elif entry["level"] == "Review":
+            decide.append(entry)
+        else:
+            keep.append(entry)
+
+        remediation = service.get("remediation") or {}
+        blocked = remediation.get("blocked_stop")
+        if blocked:
+            record = never.setdefault(
+                blocked,
+                {"command": blocked, "reason": remediation.get("stop_block") or "", "ports": []},
+            )
+            if entry["port"] not in record["ports"]:
+                record["ports"].append(entry["port"])
+
+    return {"act": act, "decide": decide, "keep": keep, "never": list(never.values())}
+
+
+app.jinja_env.globals["action_plan"] = action_plan
 
 
 def exposure_score(services: list[dict]) -> dict:
@@ -872,8 +911,10 @@ def scan_history() -> list[dict]:
         scan.setdefault("scan_label", SCAN_PROFILES["quick"]["label"])
         scan.setdefault("scan_scope", SCAN_PROFILES["quick"]["scope"])
         for service in scan.get("services", []):
+            # Recommendations are recalculated at display time so policy and copy
+            # changes apply consistently; the stored classification stays as evidence.
             current_guidance = risk_for(service, approved_ports, service.get("owner"))
-            service.setdefault("decision", current_guidance["decision"])
+            service["decision"] = current_guidance["decision"]
             # Plans are calculated at display time so outdated scans cannot keep
             # showing an unsafe action after the policy has changed.
             service["remediation"] = remediation_plan(service)

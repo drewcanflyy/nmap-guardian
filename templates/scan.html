@@ -36,6 +36,78 @@
 
 <p class="scan-snapshot" data-reveal><strong>Saved result.</strong> These counts describe {{ scan.timestamp }}. After any change, run a new scan or use the automatic test cleanup to create fresh evidence.</p>
 
+{% set plan = action_plan(scan.services) %}
+{% if scan.services %}
+<section class="plan" data-reveal aria-labelledby="plan-title">
+  <div class="plan-head">
+    <div>
+      <p class="eyebrow">Action plan</p>
+      <h2 id="plan-title">What this result asks you to do.</h2>
+    </div>
+    <p class="plan-counts">
+      {% if plan.act %}<span class="plan-count plan-count--bad">{{ plan.act|length }} act now</span>{% endif %}
+      {% if plan.decide %}<span class="plan-count plan-count--warn">{{ plan.decide|length }} to review</span>{% endif %}
+      {% if plan.keep %}<span class="plan-count plan-count--ok">{{ plan.keep|length }} expected</span>{% endif %}
+    </p>
+  </div>
+
+  {% if plan.act or plan.decide %}
+  <div class="plan-body">
+    {% if plan.act %}
+    <div class="plan-group">
+      <h3>Act now</h3>
+      <div class="plan-list">
+        {% for item in plan.act %}
+        <a class="plan-item" href="#finding-{{ item.port }}">
+          <span class="plan-port">{{ item.port }}</span>
+          <span class="plan-main">
+            <strong>{{ item.label }}</strong>
+            <span class="plan-action">{{ item.action }}</span>
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if plan.decide %}
+    <div class="plan-group">
+      <h3>Review and decide</h3>
+      <div class="plan-list">
+        {% for item in plan.decide[:4] %}
+        <a class="plan-item" href="#finding-{{ item.port }}">
+          <span class="plan-port">{{ item.port }}</span>
+          <span class="plan-main">
+            <strong>{{ item.label }}</strong>
+            <span class="plan-action">{{ item.action }}</span>
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+      {% if plan.decide|length > 4 %}
+      <p class="plan-more">+{{ plan.decide|length - 4 }} more in the findings below.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="plan-clear">Nothing needs action on this result. Keep it as evidence and rescan after any change.</p>
+  {% endif %}
+
+  {% if plan.never %}
+  <div class="plan-never">
+    <h3>Never run these</h3>
+    {% for item in plan.never %}
+    <div class="plan-never-row">
+      <code>{{ item.command }}</code>
+      <p>{{ item.reason }} Ports {{ item.ports|join(', ') }}.</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if inspection_result %}
 <section class="console {% if inspection_result.error %}console--error{% endif %}" data-reveal>
   <header class="console-head">
@@ -187,7 +259,7 @@
 <div class="findings" data-reveal>
   {% for service in scan.services %}
   {% set level = service.level|lower %}
-  <article class="finding finding--{{ level }}" data-finding>
+  <article class="finding finding--{{ level }}" id="finding-{{ service.port }}" data-finding>
     <div class="finding-row">
       <div class="finding-port">
         <span class="port-num">{{ service.port }}</span>
@@ -212,6 +284,9 @@
 
       <div class="finding-tags">
         <span class="status-pill status-pill--{{ level }}">{{ service.level }}</span>
+        {% if service.decision %}
+        <span class="next-pill" title="Recommended next step">{{ service.decision.label }}</span>
+        {% endif %}
         {% if service.cve %}
         <span class="advisory-pill" title="{{ service.cve.name }}. {{ service.cve.summary }}">
           {{ service.cve.cve_id }}<span class="cvss">{{ service.cve.cvss }}</span>

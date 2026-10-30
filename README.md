@@ -24,6 +24,8 @@ Nmap Guardian is a local-only Flask dashboard for the **Cartographie et services
 
 ![Findings with the remediation drawer open](docs/screenshots/scan-drawer.png)
 
+![Action plan at the top of a scan result](docs/screenshots/action-plan.png)
+
 ![Scan page on a 390 px viewport](docs/screenshots/scan-mobile.png)
 
 The interface uses a cold graphite instrument-panel language: hairline geometry, a single azure signal accent, semantic status colors, Geist and Geist Mono, and Motion for entry choreography. Every panel has a defined empty, loading, and error state, and the whole layout collapses to a single column at 390 px.
