@@ -3,6 +3,7 @@
 {% block body_class %}scan-page{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('index') }}"><span aria-hidden="true">←</span> Dashboard</a>
+
 <section class="result-head" data-intro>
   <div>
     <p class="eyebrow">Inspection {{ scan.id }}</p>
@@ -81,127 +82,167 @@
   <div><p class="panel-kicker">Exposure priority</p><h2>{{ scan.score.label }}</h2><p>Minus 12 points per Review finding and 35 points per Danger finding. This is a prioritization aid, not a vulnerability verdict.</p></div>
   <div class="score-counts"><span>Good <strong>{{ scan.score.counts.Good }}</strong></span><span>Review <strong>{{ scan.score.counts.Review }}</strong></span><span>Danger <strong>{{ scan.score.counts.Danger }}</strong></span></div>
 </section>
+
 <section class="section-heading services-heading" data-reveal>
   <div>
-    <p class="eyebrow">Security Audit</p>
-    <h2>{{ scan.services|length }} Discovered Service(s)</h2>
+    <p class="eyebrow">Local Service Surface</p>
+    <h2>{{ scan.services|length }} Detected Listening Service(s)</h2>
   </div>
 </section>
 
 {% if scan.services %}
-<div class="services-table-wrapper" data-reveal>
-  <div class="table-header-row">
-    <div class="col-port">Port</div>
-    <div class="col-service">Service & Version</div>
-    <div class="col-status">Risk / CVE</div>
-    <div class="col-owner">Process Owner</div>
-    <div class="col-actions">Remediation</div>
-  </div>
-
-  <div class="services-table-body">
-    {% for service in scan.services %}
-    <div class="service-row status-{{ service.level|lower }}">
-      <div class="service-row-main">
-        <div class="col-port">
-          <span class="port-num">{{ service.port }}</span>
-          <span class="proto-tag">{{ service.protocol }}</span>
-        </div>
-        <div class="col-service">
-          <strong class="service-name">{{ service.service }}</strong>
-          <small class="service-ver">{{ service.details }}</small>
-        </div>
-        <div class="col-status">
-          <span class="status-badge status-{{ service.level|lower }}">{{ service.level }}</span>
-          {% if service.cve %}
-          <span class="cve-pill" title="{{ service.cve.name }}: {{ service.cve.summary }}">{{ service.cve.cve_id }}</span>
-          {% endif %}
-        </div>
-        <div class="col-owner">
-          {% if service.owner %}
-          <span class="owner-pill"><code>PID {{ service.owner.pid }}</code> {{ service.owner.process }}</span>
-          {% else %}
-          <span class="text-muted">—</span>
-          {% endif %}
-        </div>
-        <div class="col-actions">
-          <button type="button" class="btn-toggle-details" onclick="this.closest('.service-row').classList.toggle('is-expanded')">
-            <span>Fix & Details</span>
-            <span class="chevron">▼</span>
-          </button>
-          {% if service.remediation and service.remediation.auto_stop %}
-          <form class="inline-auto-stop" method="post" action="{{ url_for('remediate_test_process', scan_id=scan.id, port=service.port) }}" onsubmit="return confirm('Wach bghiti tsedd had l-port ({{ service.port }}) f l-system?');">
-            <button class="btn-quick-stop" type="submit" title="Auto-close test server">Auto-Stop</button>
-          </form>
-          {% endif %}
-        </div>
+<div class="finding-list" data-reveal>
+  {% for service in scan.services %}
+  <article class="finding-card finding-{{ service.level|lower }}">
+    <!-- Card Main Row -->
+    <div class="finding-header">
+      <!-- Port badge -->
+      <div class="port-badge">
+        <span class="port-num">{{ service.port }}</span>
+        <span class="port-proto">{{ service.protocol|upper }}</span>
       </div>
 
-      <!-- Compact Drawer with Commands & Details -->
-      <div class="service-row-drawer">
-        <div class="drawer-grid">
-          <div class="drawer-info">
-            <span class="drawer-label">Security Analysis</span>
-            <p class="drawer-desc">{{ service.reason }}</p>
-            {% if service.cve %}
-            <div class="drawer-cve-alert">
-              <span class="cve-alert-tag">{{ service.cve.cve_id }} · {{ service.cve.severity }} (CVSS {{ service.cve.cvss }})</span>
-              <strong>{{ service.cve.name }}</strong>
-              <p>{{ service.cve.summary }}</p>
-            </div>
-            {% endif %}
-            <div class="drawer-recommendation">
-              <strong>Action:</strong> {{ service.action }}
-            </div>
-          </div>
-
-          <div class="drawer-commands">
-            <span class="drawer-label">Remediation Commands (Copyable)</span>
-            {% if service.cve and service.remediation.update_cmd %}
-            <div class="cmd-item">
-              <span class="cmd-tag cmd-tag-fix">Linux CVE Patch</span>
-              <code>{{ service.remediation.update_cmd }}</code>
-              <button type="button" class="btn-copy-mini" data-copy-command="{{ service.remediation.update_cmd }}">Copy</button>
-            </div>
-            {% endif %}
-
-            {% if service.remediation.stop %}
-            <div class="cmd-item">
-              <span class="cmd-tag">PowerShell Stop</span>
-              <code>{{ service.remediation.stop }}</code>
-              <button type="button" class="btn-copy-mini" data-copy-command="{{ service.remediation.stop }}">Copy</button>
-            </div>
-            {% endif %}
-
-            {% if service.remediation.linux_stop %}
-            <div class="cmd-item">
-              <span class="cmd-tag">Linux Sudo Stop</span>
-              <code>{{ service.remediation.linux_stop }}</code>
-              <button type="button" class="btn-copy-mini" data-copy-command="{{ service.remediation.linux_stop }}">Copy</button>
-            </div>
-            {% endif %}
-
-            {% if service.remediation.firewall %}
-            <div class="cmd-item">
-              <span class="cmd-tag">Windows Firewall</span>
-              <code>{{ service.remediation.firewall }}</code>
-              <button type="button" class="btn-copy-mini" data-copy-command="{{ service.remediation.firewall }}">Copy</button>
-            </div>
-            {% endif %}
-
-            <div class="cmd-item">
-              <span class="cmd-tag">Inspect Port</span>
-              <code>{{ service.remediation.inspect }}</code>
-              <button type="button" class="btn-copy-mini" data-copy-command="{{ service.remediation.inspect }}">Copy</button>
-            </div>
-          </div>
+      <!-- Service Info & Assessment -->
+      <div class="service-meta">
+        <div class="service-primary-row">
+          <strong class="service-name">{{ service.service }}</strong>
+          {% if service.details and service.details != 'No extra version details' and service.details != 'No version information returned' and service.details != 'No extra version information' %}
+          <span class="service-version-tag">{{ service.details }}</span>
+          {% endif %}
+          
+          {% if service.owner %}
+          <span class="owner-tag" title="Bound to {{ service.owner.address }}">
+            <span class="owner-pid">PID {{ service.owner.pid }}</span>
+            <span class="owner-proc">{{ service.owner.process }}</span>
+          </span>
+          {% endif %}
         </div>
+        <p class="service-reason">{{ service.reason }}</p>
+      </div>
+
+      <!-- Risk Badge & CVE Pill -->
+      <div class="status-tags">
+        <span class="status-badge status-{{ service.level|lower }}">{{ service.level }}</span>
+        {% if service.cve %}
+        <span class="cve-badge cve-{{ service.cve.severity|lower }}" title="{{ service.cve.name }}: {{ service.cve.summary }}">
+          <span class="cve-dot"></span>
+          {{ service.cve.cve_id }}
+          <span class="cve-score">{{ service.cve.severity }}</span>
+        </span>
+        {% endif %}
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="finding-actions">
+        {% if service.remediation and service.remediation.auto_stop %}
+        <form class="inline-stop-form" method="post" action="{{ url_for('remediate_test_process', scan_id=scan.id, port=service.port) }}" onsubmit="return confirm('Stop test server on port {{ service.port }}?');">
+          <button class="btn-stop-test" type="submit" title="Kill test server and re-verify">
+            <span class="btn-dot-red"></span> Stop Server
+          </button>
+        </form>
+        {% endif %}
+        
+        <button type="button" class="btn-toggle-remediation" onclick="this.closest('.finding-card').classList.toggle('is-expanded')" aria-label="Toggle remediation drawer">
+          <span class="toggle-label">Remediation</span>
+          <span class="toggle-icon">▾</span>
+        </button>
       </div>
     </div>
-    {% endfor %}
-  </div>
+
+    <!-- Expandable Remediation Drawer -->
+    <div class="finding-drawer">
+      <div class="drawer-content">
+        
+        <!-- Left: Action Guidance & CVE Alert -->
+        <div class="drawer-guidance">
+          <div class="guidance-box">
+            <span class="drawer-kicker">Recommended Next Step</span>
+            <p class="guidance-text">{{ service.action }}</p>
+          </div>
+
+          {% if service.cve %}
+          <div class="cve-callout cve-callout-{{ service.cve.severity|lower }}">
+            <div class="cve-callout-header">
+              <span class="cve-id-badge">{{ service.cve.cve_id }}</span>
+              <span class="cve-cvss-badge">CVSS {{ service.cve.cvss }} · {{ service.cve.severity }}</span>
+            </div>
+            <strong class="cve-callout-title">{{ service.cve.name }}</strong>
+            <p class="cve-callout-desc">{{ service.cve.summary }}</p>
+          </div>
+          {% endif %}
+
+          {% if service.owner and service.owner.services %}
+          <div class="service-owner-detail">
+            <span>Windows Service(s):</span> <code>{{ service.owner.services }}</code>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Right: Copyable Shell Commands -->
+        <div class="drawer-commands">
+          <span class="drawer-kicker">Remediation Commands</span>
+
+          {% if service.cve and service.remediation.update_cmd %}
+          <div class="cmd-tile cmd-tile-patch">
+            <div class="cmd-header">
+              <span class="cmd-env-tag env-linux">Linux / CVE Patch</span>
+              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.update_cmd }}">Copy</button>
+            </div>
+            <code>{{ service.remediation.update_cmd }}</code>
+          </div>
+          {% endif %}
+
+          {% if service.remediation.stop %}
+          <div class="cmd-tile">
+            <div class="cmd-header">
+              <span class="cmd-env-tag env-win">PowerShell (Stop Process)</span>
+              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.stop }}">Copy</button>
+            </div>
+            <code>{{ service.remediation.stop }}</code>
+          </div>
+          {% endif %}
+
+          {% if service.remediation.linux_stop %}
+          <div class="cmd-tile">
+            <div class="cmd-header">
+              <span class="cmd-env-tag env-linux">Linux Sudo (Stop Service)</span>
+              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.linux_stop }}">Copy</button>
+            </div>
+            <code>{{ service.remediation.linux_stop }}</code>
+          </div>
+          {% endif %}
+
+          {% if service.remediation.firewall %}
+          <div class="cmd-tile">
+            <div class="cmd-header">
+              <span class="cmd-env-tag env-win">Windows Firewall (Block Inbound)</span>
+              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.firewall }}">Copy</button>
+            </div>
+            <code>{{ service.remediation.firewall }}</code>
+          </div>
+          {% endif %}
+
+          {% if service.remediation.inspect %}
+          <div class="cmd-tile">
+            <div class="cmd-header">
+              <span class="cmd-env-tag env-win">PowerShell (Inspect Listener)</span>
+              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.inspect }}">Copy</button>
+            </div>
+            <code>{{ service.remediation.inspect }}</code>
+          </div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </article>
+  {% endfor %}
 </div>
 {% else %}
-<section class="empty-state"><h2>No open TCP services detected.</h2><p>This is a useful baseline. Start the controlled local Python server and scan again to produce before/after evidence.</p></section>
+<section class="empty-state">
+  <h2>No open TCP services detected.</h2>
+  <p>This is a clean baseline. Start a local server (e.g. Python on port 8000) and scan again to verify exposure detection.</p>
+</section>
 {% endif %}
 
 {% if scan.services %}
