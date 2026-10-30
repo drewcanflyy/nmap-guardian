@@ -13,15 +13,22 @@ Nmap Guardian howa dashboard local (Flask) kayf7es ghir `127.0.0.1`, kay9ra les 
 
 L objectif machi "nkhesser l PC", l objectif howa **tfhem l surface dyalek w t9arrer**.
 
-## 2. Les 3 modes dyal scan
+## 2. Les modes dyal scan
 
-| Mode | Command | Les ports | Chno kayzid |
-|---|---|---|---|
-| Scan localhost | `nmap -sV --version-light -oX - 127.0.0.1` | top 1000 TCP | inventory سريع |
-| Detailed versions | `nmap -sV --version-all -oX - 127.0.0.1` | نفس top 1000 | version أدق (أبطأ) |
-| All TCP ports | `nmap -sV --version-light -p- -oX - 127.0.0.1` | 65,535 TCP | kayl9a ports ghayr standard |
+| Mode | Chno kaydir | Chno kayzid |
+|---|---|---|
+| Scan localhost | top 1,000 TCP + light version | inventory سريع + SMB discovery |
+| Detailed versions | نفس l ports + `--version-all` | version أدق، أبطأ |
+| All TCP ports | `-p-` + light version | kayl9a ports ghayr standard |
+| Deep + versions | `-p- --version-all` | all ports + version كامل (بطيء بزاف) |
+| UDP top 100 | `-sU --top-ports 100` | UDP، غالباً `open\|filtered` |
+| NSE verification | `--script vuln,smb-...` | NSE vuln checks، نتائجها hints |
 
-Timeouts: 60s / 120s / 240s. Ma kaynch UDP، ma kaynch `-O`، ma kaynch `--script vuln`.
+SMB discovery kaysta3mel `smb-os-discovery`، `smb2-security-mode`، w `smb2-time`. l NSE output kayban f drawer، w l CVE kaytsajjel ghir ila l script gal «VULNERABLE».
+
+UDP: `open|filtered` ma kayt7sebch f score، w ma kaybanch f findings. kayban f note m3a l ports، 7it machi proof.
+
+Timeouts: 60s / 120s / 240s / 480s / 240s / 360s.
 
 ## 3. Les niveaux
 

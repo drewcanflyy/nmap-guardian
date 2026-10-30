@@ -9,7 +9,7 @@
     <dl class="hero-meta">
       <div><dt>Target</dt><dd>127.0.0.1</dd></div>
       <div><dt>Mode</dt><dd>Service inventory</dd></div>
-      <div><dt>Transport</dt><dd>TCP</dd></div>
+      <div><dt>Transport</dt><dd>TCP + UDP</dd></div>
     </dl>
   </div>
 
@@ -32,22 +32,21 @@
           <span class="btn-arrow" aria-hidden="true">↗</span>
         </button>
         <div class="scan-actions-row">
-          <button class="btn btn-ghost" type="submit" name="scan_mode" value="vuln" {% if not nmap_available %}disabled{% endif %}>
-            <span class="button-label">Detailed versions</span>
+          {% for key, profile in scan_profiles.items() if key != 'quick' %}
+          <button class="btn btn-ghost" type="submit" name="scan_mode" value="{{ key }}" title="{{ profile.scope }} {{ profile.caution }}" {% if not nmap_available %}disabled{% endif %}>
+            <span class="button-label">{{ profile.button }}</span>
           </button>
-          <button class="btn btn-ghost" type="submit" name="scan_mode" value="deep" {% if not nmap_available %}disabled{% endif %}>
-            <span class="button-label">All TCP ports</span>
-          </button>
+          {% endfor %}
         </div>
       </form>
 
       <div class="command">
         <span class="command-label">cmd</span>
-        <code>nmap -sV --version-light -oX - 127.0.0.1</code>
-        <button class="chip-button" type="button" data-copy-command="nmap -sV --version-light -oX - 127.0.0.1">Copy</button>
+        <code title="{{ quick_command }}">{{ quick_command }}</code>
+        <button class="chip-button" type="button" data-copy-command="{{ quick_command }}">Copy</button>
       </div>
 
-      <p class="panel-note">All TCP ports checks 65,535 local ports and can take up to four minutes. UDP sits outside this coursework scope.</p>
+      <p class="panel-note">Standard scan covers the top 1,000 TCP ports and runs SMB OS discovery. Deep and NSE verification can take minutes; UDP needs Npcap and usually an elevated shell.</p>
     </section>
   </div>
 </section>

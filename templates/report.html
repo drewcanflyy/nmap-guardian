@@ -22,6 +22,11 @@
   <span>{{ scan.score.label }}. Minus 12 points per Review finding and minus 35 per Danger finding.</span>
 </section>
 
+{% if scan.get('udp_ambiguous') %}
+<p class="print-note">{{ scan.udp_ambiguous|length }} UDP port(s) returned open|filtered and are not counted as confirmed exposure:
+  {% for item in scan.udp_ambiguous %}{{ item.port }} {{ item.service }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+{% endif %}
+
 <h2>Service inventory</h2>
 <table class="report-table">
   <thead>

@@ -8,6 +8,9 @@ Nmap Guardian is a local-only Flask dashboard for the **Cartographie et services
 
 - Standard scan for common local TCP ports.
 - Deep scan for all 65,535 local TCP ports.
+- Deep scan with full version probing, and a UDP top-100 profile.
+- NSE verification profile that runs Nmap vulnerability scripts against localhost and captures their output as evidence.
+- SMB discovery on port 445 (`smb-os-discovery`, `smb2-security-mode`, `smb2-time`), including whether SMB signing is required.
 - Nmap XML parsing with service and version details when available.
 - Good, Review, and Danger findings with explainable rules and a direct per-port decision (keep, close after test, protect, or investigate).
 - Approved-port baseline management.
@@ -39,6 +42,8 @@ The interface uses a cold graphite instrument-panel language: hairline geometry,
 - The dashboard automatically stops only a verified Python/Node test server on ports 3000, 8000, or 8080, then creates a new verification scan.
 - Windows core services, sensitive ports, firewall rules, and the dashboard's own port 5000 never receive automatic actions.
 - A finding is an exposure observation, not proof of a vulnerability.
+- NSE verification runs vulnerability scripts against `127.0.0.1` only. Its hits are hints that still need confirmation; the app never exploits a target.
+- UDP scans often return `open|filtered`, which is not confirmed exposure. Those ports are listed separately and are excluded from the findings and the exposure score.
 - A package version check indicates that an update exists; it is not a CVE/vulnerability verdict. Review compatibility and update inside the correct virtual environment.
 
 ## Run locally

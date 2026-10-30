@@ -24,10 +24,14 @@
     <form method="post" action="{{ url_for('python_dependency_audit', scan_id=scan.id) }}" data-python-audit-form>
       <button class="btn btn-ghost btn-sm" type="submit"><span class="button-label">Python packages</span></button>
     </form>
-    <form method="post" action="{{ url_for('run_scan') }}" data-scan-form>
-      <input type="hidden" name="scan_mode" value="{{ scan.scan_mode }}">
+    <form class="rescan-form" method="post" action="{{ url_for('run_scan') }}" data-scan-form>
+      <select class="profile-select" name="scan_mode" aria-label="Scan profile">
+        {% for key, profile in scan_profiles.items() %}
+        <option value="{{ key }}" {% if key == scan.scan_mode %}selected{% endif %}>{{ profile.label }}</option>
+        {% endfor %}
+      </select>
       <button class="btn btn-primary btn-sm" type="submit">
-        <span class="button-label">Rescan localhost</span>
+        <span class="button-label">Rescan</span>
         <span class="btn-arrow" aria-hidden="true">↗</span>
       </button>
     </form>
@@ -106,6 +110,15 @@
   </div>
   {% endif %}
 </section>
+{% endif %}
+
+{% if scan.get('udp_ambiguous') %}
+<aside class="udp-note" data-reveal>
+  <span class="boundary-tag">UDP</span>
+  <p>{{ scan.udp_ambiguous|length }} UDP port(s) returned <code>open|filtered</code> and are not counted as confirmed exposure:
+    {% for item in scan.udp_ambiguous %}<span class="udp-port">{{ item.port }} {{ item.service }}</span>{% endfor %}
+  </p>
+</aside>
 {% endif %}
 
 {% if inspection_result %}
@@ -292,6 +305,9 @@
           {% if service.details and service.details not in ['No extra version details', 'No version information returned', 'No extra version information'] %}
           <span class="version-tag">{{ service.details }}</span>
           {% endif %}
+          {% if service.state and service.state != 'open' %}
+          <span class="version-tag">{{ service.state }}</span>
+          {% endif %}
           {% if service.owner %}
           <span class="owner-tag" title="Bound to {{ service.owner.address }}">
             <span class="owner-pid">PID {{ service.owner.pid }}</span>
@@ -363,6 +379,27 @@
 
             {% if service.owner and service.owner.services %}
             <p class="owner-detail">Windows service: <code>{{ service.owner.services }}</code></p>
+            {% endif %}
+
+            {% if service.smb %}
+            {% set smb_parts = [] %}
+            {% if service.smb.get('OS') %}{% set _ = smb_parts.append(service.smb['OS']) %}{% endif %}
+            {% if service.smb.get('Computer name') %}{% set _ = smb_parts.append(service.smb['Computer name']) %}{% endif %}
+            {% if service.smb.get('Domain name') %}{% set _ = smb_parts.append(service.smb['Domain name']) %}{% endif %}
+            {% if service.smb.get('signing') %}{% set _ = smb_parts.append(service.smb['signing']) %}{% endif %}
+            <p class="owner-detail">SMB discovery: <code>{{ smb_parts|join(' · ') }}</code></p>
+            {% endif %}
+
+            {% if service.scripts %}
+            <div class="nse-box">
+              <span class="drawer-kicker">NSE output</span>
+              {% for script in service.scripts %}
+              <details class="nse-item">
+                <summary>{{ script.id }}</summary>
+                <pre>{{ script.output }}</pre>
+              </details>
+              {% endfor %}
+            </div>
             {% endif %}
 
             {% if service.mitigation %}

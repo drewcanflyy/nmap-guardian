@@ -27,22 +27,53 @@ MITIGATIONS_FILE = DATA_DIR / "mitigations.json"
 LOCAL_TARGET = "127.0.0.1"
 SCAN_PROFILES = {
     "quick": {
-        "arguments": [],
+        "arguments": ["--version-light", "--script", "smb-os-discovery,smb2-security-mode,smb2-time"],
         "label": "Standard local scan",
-        "scope": "Common TCP ports with service detection",
+        "button": "Scan localhost",
+        "scope": "Top 1,000 TCP ports, light service detection, SMB OS discovery.",
+        "caution": "",
         "timeout": 60,
     },
+    "vuln": {
+        "arguments": ["--version-all", "--script", "smb-os-discovery,smb2-security-mode,smb2-time"],
+        "label": "Detailed service version scan",
+        "button": "Detailed versions",
+        "scope": "Same 1,000 TCP ports with full version probing.",
+        "caution": "Slower than the standard scan.",
+        "timeout": 120,
+    },
     "deep": {
-        "arguments": ["-p-"],
+        "arguments": ["-p-", "--version-light", "--script", "smb-os-discovery,smb2-security-mode,smb2-time"],
         "label": "Deep local TCP scan",
-        "scope": "All 65,535 local TCP ports with lightweight service detection",
+        "button": "All TCP ports",
+        "scope": "All 65,535 TCP ports with light service detection.",
+        "caution": "Can take up to four minutes.",
         "timeout": 240,
     },
-    "vuln": {
-        "arguments": [],
-        "label": "Detailed service version scan",
-        "scope": "Full version detection on the common TCP ports. Banners are not exploit checks.",
-        "timeout": 120,
+    "deepver": {
+        "arguments": ["-p-", "--version-all", "--script", "smb-os-discovery,smb2-security-mode,smb2-time"],
+        "label": "Deep scan with full versions",
+        "button": "Deep + versions",
+        "scope": "All 65,535 TCP ports with full version probing.",
+        "caution": "Slow. Budget up to eight minutes.",
+        "timeout": 480,
+    },
+    "udp": {
+        "arguments": ["-sU", "--top-ports", "100"],
+        "service_detection": False,
+        "label": "UDP top 100 scan",
+        "button": "UDP top 100",
+        "scope": "Top 100 UDP ports. Open|filtered is ambiguous by nature.",
+        "caution": "Needs Npcap and usually an elevated shell.",
+        "timeout": 240,
+    },
+    "verify": {
+        "arguments": ["--version-light", "--script", "vuln and not http-*,smb-os-discovery,smb2-security-mode,smb2-time"],
+        "label": "NSE vulnerability verification",
+        "button": "NSE verification",
+        "scope": "NSE vulnerability checks for SMB and RPC on localhost. HTTP script checks are excluded so the dashboard cannot stall its own scan.",
+        "caution": "Slow and noisy. Every hit still needs confirmation.",
+        "timeout": 360,
     },
 }
 DEVELOPMENT_PORTS = {3000, 5000, 8000, 8080}
@@ -167,13 +198,25 @@ def local_listeners() -> dict[int, dict]:
     return listeners
 
 
+def script_cve_ids(output: str) -> list[str]:
+    """Extract CVEs only from an NSE output that actually reports a positive hit."""
+    upper = output.upper()
+    if "VULNERABLE" not in upper or "NOT VULNERABLE" in upper or "COULD NOT" in upper:
+        return []
+    return [cve.upper() for cve in re.findall(r"CVE-\d{4}-\d{4,7}", output, re.IGNORECASE)]
+
+
 def parse_nmap_xml(xml_text: str) -> list[dict]:
     root = ET.fromstring(xml_text)
     ports: list[dict] = []
     for port in root.findall(".//port"):
+        protocol = port.attrib.get("protocol", "tcp")
         state = port.find("state")
-        if state is None or state.attrib.get("state") != "open":
+        state_value = state.attrib.get("state", "") if state is not None else ""
+        # UDP reports open|filtered when no response proves either state.
+        if state_value != "open" and not (protocol == "udp" and state_value == "open|filtered"):
             continue
+
         service = port.find("service")
         service_data = service.attrib if service is not None else {}
         pieces = [
@@ -183,22 +226,57 @@ def parse_nmap_xml(xml_text: str) -> list[dict]:
         ]
         details = " ".join(piece for piece in pieces if piece).strip()
 
-        # Parse any CVEs reported directly by Nmap scripts (vulners / vuln)
-        script_cves = []
+        script_cves: list[str] = []
+        scripts: list[dict] = []
+        smb: dict[str, str] = {}
         for script in port.findall("script"):
+            script_id = str(script.attrib.get("id", ""))
             output = str(script.attrib.get("output", ""))
-            for cve in re.findall(r"CVE-\d{4}-\d{4,7}", output, re.IGNORECASE):
-                script_cves.append(cve.upper())
+            script_cves.extend(script_cve_ids(output))
+            if output:
+                scripts.append({"id": script_id, "output": output[:1200]})
+            if script_id == "smb-os-discovery,smb2-security-mode,smb2-time":
+                for line in output.splitlines():
+                    for field in ("OS", "Computer name", "Domain name"):
+                        if line.startswith(f"{field}:"):
+                            smb[field] = line.split(":", 1)[1].strip().replace("\x00", "")
 
-        ports.append(
-            {
-                "port": int(port.attrib["portid"]),
-                "protocol": port.attrib.get("protocol", "tcp"),
-                "service": service_data.get("name", "unknown"),
-                "details": details or "No version information returned",
-                "detected_cves": list(dict.fromkeys(script_cves)),
-            }
+        if smb.get("OS"):
+            details = f"{details} · {smb['OS']}" if details else smb["OS"]
+
+        entry = {
+            "port": int(port.attrib["portid"]),
+            "protocol": protocol,
+            "state": state_value,
+            "service": service_data.get("name", "unknown"),
+            "details": details or "No version information returned",
+            "detected_cves": list(dict.fromkeys(script_cves)),
+            "scripts": scripts[:4],
+        }
+        if smb:
+            entry["smb"] = smb
+        ports.append(entry)
+
+    # Host-level NSE results (SMB2 security mode, time) belong to the SMB service.
+    host_scripts: list[dict] = []
+    for script in root.findall(".//hostscript/script"):
+        output = str(script.attrib.get("output", ""))
+        if output:
+            host_scripts.append({"id": str(script.attrib.get("id", "")), "output": output[:1200]})
+
+    if host_scripts:
+        smb_service = next(
+            (item for item in ports if item["port"] == 445 and item["protocol"] == "tcp"),
+            None,
         )
+        if smb_service is not None:
+            smb_service["scripts"].extend(host_scripts[:4])
+            for script in host_scripts:
+                smb_service["detected_cves"].extend(script_cve_ids(script["output"]))
+                if script["id"] == "smb2-security-mode" and "not required" in script["output"].lower():
+                    smb_service.setdefault("smb", {})["signing"] = "SMB signing enabled but not required"
+            smb_service["detected_cves"] = list(dict.fromkeys(smb_service["detected_cves"]))
+
     return sorted(ports, key=lambda item: (item["protocol"], item["port"]))
 
 
@@ -427,6 +505,18 @@ def risk_for(service: dict, approved_ports: set[int], owner: dict | None = None)
                 ["Leave it open only while it is still needed.", "Rescan after any configuration or software change."],
             ),
         }
+    if service.get("state") == "open|filtered":
+        return {
+            "level": "Review",
+            "reason": "UDP gave no response, so Nmap cannot prove this port is open. It is open|filtered, which may also mean a firewall silently drops it.",
+            "action": "Verify with the owning service or a targeted probe before treating this port as open.",
+            "decision": decision(
+                "Verify, do not assume",
+                "investigate",
+                "An ambiguous UDP result is not proof of an exposed service.",
+                ["Confirm with the application owner or a protocol-specific probe.", "Do not open a firewall rule just because of this result.", "Do not count it as confirmed exposure."],
+            ),
+        }
     if port == 135 or (process_name == "svchost" and "rpc" in str((owner or {}).get("services", "")).lower()):
         return {
             "level": "Review",
@@ -522,6 +612,8 @@ def action_plan(services: list[dict]) -> dict:
 
     for service in services:
         decision = service.get("decision") or {}
+        if service.get("state", "open") != "open":
+            continue
         entry = {
             "port": int(service["port"]),
             "service": service.get("service", "unknown"),
@@ -556,6 +648,9 @@ def exposure_score(services: list[dict]) -> dict:
     """Return an explainable priority score, not a vulnerability score."""
     counts = {"Good": 0, "Review": 0, "Danger": 0}
     for service in services:
+        # Ambiguous UDP results are not confirmed exposure and must not move the score.
+        if service.get("state", "open") != "open":
+            continue
         counts[service["level"]] = counts.get(service["level"], 0) + 1
     score = max(0, 100 - (counts["Review"] * 12) - (counts["Danger"] * 35))
     label = "Controlled" if score >= 85 else "Needs review" if score >= 60 else "Action needed"
@@ -893,6 +988,22 @@ def enrich_services(services: list[dict], listeners: dict[int, dict] | None = No
     return enriched
 
 
+def scan_command_parts(profile: dict) -> list[str]:
+    """Build the Nmap arguments for one profile, including optional service detection."""
+    parts: list[str] = []
+    if profile.get("service_detection", True):
+        parts.append("-sV")
+    parts.extend(profile["arguments"])
+    parts.extend(["-oX", "-", LOCAL_TARGET])
+    return parts
+
+
+def scan_command_text(profile_name: str) -> str:
+    """Return the recorded command for a profile, without the executable path."""
+    parts = ["nmap", *scan_command_parts(SCAN_PROFILES[profile_name])]
+    return " ".join(f'"{part}"' if " " in part else part for part in parts)
+
+
 def scan_localhost(profile_name: str = "quick") -> dict:
     executable = find_nmap()
     if not executable:
@@ -901,8 +1012,7 @@ def scan_localhost(profile_name: str = "quick") -> dict:
     if not profile:
         raise RuntimeError("The requested scan profile is not available.")
 
-    version_flag = "--version-all" if profile_name == "vuln" else "--version-light"
-    command = [executable, "-sV", version_flag, *profile["arguments"], "-oX", "-", LOCAL_TARGET]
+    command = [executable, *scan_command_parts(profile)]
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=profile["timeout"], check=False)
     except subprocess.TimeoutExpired as error:
@@ -913,24 +1023,30 @@ def scan_localhost(profile_name: str = "quick") -> dict:
     if not result.stdout.strip():
         raise RuntimeError(result.stderr.strip() or "Nmap did not return XML output.")
     try:
-        services = enrich_services(parse_nmap_xml(result.stdout), local_listeners(), load_mitigations())
+        parsed = parse_nmap_xml(result.stdout)
     except ET.ParseError as error:
         raise RuntimeError("Nmap returned output that could not be parsed as XML.") from error
+
+    # UDP open|filtered is not confirmed exposure: keep it out of findings and score.
+    ambiguous = [
+        {"port": item["port"], "service": item["service"], "state": item["state"]}
+        for item in parsed
+        if item.get("state") == "open|filtered"
+    ]
+    confirmed = [item for item in parsed if item.get("state", "open") == "open"]
+    services = enrich_services(confirmed, local_listeners(), load_mitigations())
 
     return {
         "id": str(uuid.uuid4())[:8],
         "timestamp": iso_now(),
         "target": LOCAL_TARGET,
-        "command": (
-            f"nmap -sV {version_flag}"
-            + (" " + " ".join(profile["arguments"]) if profile["arguments"] else "")
-            + " -oX - 127.0.0.1"
-        ),
+        "command": scan_command_text(profile_name),
         "nmap_version": nmap_version(),
         "scan_mode": profile_name,
         "scan_label": profile["label"],
         "scan_scope": profile["scope"],
         "services": services,
+        "udp_ambiguous": ambiguous,
         "score": exposure_score(services),
         "raw_xml": result.stdout,
     }
@@ -988,8 +1104,12 @@ def save_scan(scan: dict) -> dict:
 
 
 @app.context_processor
-def inject_mitigations():
-    return {"mitigations": load_mitigations()}
+def inject_app_context():
+    return {
+        "mitigations": load_mitigations(),
+        "scan_profiles": SCAN_PROFILES,
+        "quick_command": scan_command_text("quick"),
+    }
 
 
 @app.get("/")
