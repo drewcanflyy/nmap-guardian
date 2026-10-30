@@ -1,11 +1,71 @@
 {% extends "base.html" %}
-{% block title %}Remediation guide | Nmap Guardian{% endblock %}
+{% block title %}Playbook | Nmap Guardian{% endblock %}
+{% block body_class %}page-guide{% endblock %}
 {% block content %}
-<section class="guide-head"><p class="eyebrow">Local remediation guide</p><h1>Understand the service before changing the machine.</h1><p class="lede">Use <strong>Run in PowerShell</strong> to execute the read-only owner check directly in the dashboard. Nmap Guardian can also stop and verify a narrowly defined Python or Node test server on ports 3000, 8000, or 8080. It never automatically stops Windows core services, changes firewall rules, patches software, or stops its own port 5000.</p></section>
-<section class="guide-grid">
-  <article><span class="guide-number">01</span><h2>Identify</h2><p>Record the port, service name, version information, owner, and whether it is expected. An open port is an observation, not automatic proof of a vulnerability.</p></article>
-  <article><span class="guide-number">02</span><h2>Reduce exposure</h2><p>For a temporary development server, stop it after testing. Where supported, configure it to bind to <code>127.0.0.1</code> instead of all network interfaces.</p></article>
-  <article><span class="guide-number">03</span><h2>Verify</h2><p>Run a new localhost scan. Keep the before/after results and explain whether the target port is now closed or still needed.</p></article>
+<section class="guide-hero" data-intro>
+  <p class="eyebrow">Local remediation guide</p>
+  <h1>Understand the service before you change the machine.</h1>
+  <p class="lede">One loop, three moves: identify the listener, reduce what does not need to be reachable, then prove the result with a new scan. The dashboard can inspect a listener read-only and stop a verified test server on ports 3000, 8000, or 8080.</p>
 </section>
-<section class="command-guide"><p class="eyebrow">Controlled course demo</p><h2>Python web-server example</h2><ol><li>Start a local-only web service: <code>python -m http.server 8000 --bind 127.0.0.1</code></li><li>Scan it in Nmap Guardian and document port 8000.</li><li>Open its command plan and use <strong>Stop test process + verify</strong>, or stop it with <code>Ctrl+C</code>.</li><li>The dashboard immediately creates a new scan and shows port 8000 under <strong>Newly closed</strong>.</li></ol><p class="muted">For Windows Firewall or other system services, use operating-system documentation and make changes only when you are the authorized administrator. Record the action before rescanning.</p></section>
+
+<div class="protocol">
+  <ol class="protocol-list">
+    <li class="step" data-reveal>
+      <span class="step-num">01</span>
+      <div>
+        <h2>Identify</h2>
+        <p>Record the port, service name, version, owning process, and whether the service is expected. An open port is an observation. It is not automatic proof of a vulnerability, and a CVE badge on this dashboard is a heuristic match that still needs confirmation.</p>
+      </div>
+    </li>
+    <li class="step" data-reveal>
+      <span class="step-num">02</span>
+      <div>
+        <h2>Reduce exposure</h2>
+        <p>For a temporary development server, stop it after testing. Where the application supports it, bind to <code>127.0.0.1</code> instead of every interface. For a service Windows owns, change the service or firewall policy, never the process.</p>
+      </div>
+    </li>
+    <li class="step" data-reveal>
+      <span class="step-num">03</span>
+      <div>
+        <h2>Verify</h2>
+        <p>Run a new localhost scan and compare. Keep the before and after results in the report, and say plainly whether the port is now closed, restricted, or still required. If nothing changed, the finding stays open.</p>
+      </div>
+    </li>
+  </ol>
+
+  <aside class="protocol-aside" data-reveal>
+    <div class="aside-card">
+      <h2>What this tool will never do</h2>
+      <ul class="aside-list">
+        <li class="is-blocked">Stop Windows core services or anything owned by svchost, System, or PID 4</li>
+        <li class="is-blocked">Change, add, or remove firewall rules</li>
+        <li class="is-blocked">Patch software or upgrade Python packages</li>
+        <li class="is-blocked">Stop its own port 5000</li>
+        <li>Scan any target other than <code>127.0.0.1</code></li>
+      </ul>
+      <p class="aside-note">Automatic cleanup applies only to a verified Python or Node test server on ports 3000, 8000, or 8080, and every cleanup creates a fresh verification scan.</p>
+    </div>
+  </aside>
+</div>
+
+<section class="demo" data-reveal>
+  <p class="eyebrow">Controlled demonstration</p>
+  <h2>Prove a change with a Python web server.</h2>
+  <p>This is the sequence to run in front of an examiner, from a clean machine to a documented, verified closure.</p>
+
+  <div class="empty-cmd">
+    <code>python -m http.server 8000 --bind 127.0.0.1</code>
+    <button class="chip-button" type="button" data-copy-command="python -m http.server 8000 --bind 127.0.0.1">Copy</button>
+  </div>
+
+  <ol class="demo-steps">
+    <li>Start the local-only web server with the command above.</li>
+    <li>Scan in Nmap Guardian and record port 8000, its owner, and its level.</li>
+    <li>Open the port 8000 row and use <strong>Stop server</strong>, or stop it with <code>Ctrl+C</code>.</li>
+    <li>The dashboard immediately creates a new scan and lists port 8000 under <strong>Newly closed</strong>.</li>
+    <li>Keep both inspections and export the report as evidence.</li>
+  </ol>
+
+  <p class="demo-note">For Windows Firewall or other system services, use the operating-system documentation and change things only as the authorized administrator. Record the action before you rescan.</p>
+</section>
 {% endblock %}

@@ -1,4 +1,10 @@
 {% extends "base.html" %}
+{% block title %}Scan unavailable | Nmap Guardian{% endblock %}
 {% block content %}
-<section class="error-state"><p class="eyebrow">Scan unavailable</p><h1>Could not complete the localhost scan.</h1><p>{{ message }}</p><a class="secondary" href="{{ url_for('index') }}">Return to dashboard</a></section>
+<section class="error-page" data-intro>
+  <p class="eyebrow">Scan unavailable</p>
+  <h1>Could not complete the localhost scan.</h1>
+  <p>{{ message }}</p>
+  <a class="btn btn-ghost" href="{{ url_for('index') }}"><span aria-hidden="true">←</span> Return to dashboard</a>
+</section>
 {% endblock %}

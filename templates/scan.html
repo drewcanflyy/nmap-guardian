@@ -1,62 +1,129 @@
 {% extends "base.html" %}
-{% block title %}Scan {{ scan.id }} | Nmap Guardian{% endblock %}
-{% block body_class %}scan-page{% endblock %}
+{% block title %}Inspection {{ scan.id }} | Nmap Guardian{% endblock %}
+{% block body_class %}page-scan{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('index') }}"><span aria-hidden="true">←</span> Dashboard</a>
 
-<section class="result-head" data-intro>
+<section class="scan-head" data-intro>
   <div>
     <p class="eyebrow">Inspection {{ scan.id }}</p>
-    <h1>Local exposure inventory.</h1>
-    <p class="lede">{{ scan.timestamp }} <span aria-hidden="true">/</span> Target {{ scan.target }}</p>
-    <p class="scan-profile"><span>{{ scan.scan_label }}</span>{{ scan.scan_scope }}</p>
+    <h1>Service exposure inventory.</h1>
+    <div class="scan-title-meta">
+      <span>{{ scan.timestamp }}</span>
+      <span class="sep" aria-hidden="true">/</span>
+      <span>Target <code>{{ scan.target }}</code></span>
+      <span class="sep" aria-hidden="true">/</span>
+      <span class="meta-pill">{{ scan.scan_label }}</span>
+    </div>
   </div>
-  <div class="actions" data-intro-card>
-    <a class="secondary" href="{{ url_for('report', scan_id=scan.id) }}" target="_blank">Printable report <span aria-hidden="true">↗</span></a>
-    <form method="post" action="{{ url_for('windows_update_status', scan_id=scan.id) }}" data-windows-update-form><button class="secondary" type="submit"><span class="button-label">Check Windows updates</span></button></form>
-    <form method="post" action="{{ url_for('python_dependency_audit', scan_id=scan.id) }}" data-python-audit-form><button class="secondary" type="submit"><span class="button-label">Python packages (optional)</span></button></form>
-    <form method="post" action="{{ url_for('run_scan') }}" data-scan-form><input type="hidden" name="scan_mode" value="{{ scan.scan_mode }}"><button class="primary scan-button" type="submit"><span class="button-label">Rescan localhost</span><span class="button-arrow" aria-hidden="true">↗</span></button></form>
+  <div class="scan-actions-top" data-intro-card>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('report', scan_id=scan.id) }}" target="_blank" rel="noopener">Report <span class="btn-arrow" aria-hidden="true">↗</span></a>
+    <form method="post" action="{{ url_for('windows_update_status', scan_id=scan.id) }}" data-windows-update-form>
+      <button class="btn btn-ghost btn-sm" type="submit"><span class="button-label">Windows updates</span></button>
+    </form>
+    <form method="post" action="{{ url_for('python_dependency_audit', scan_id=scan.id) }}" data-python-audit-form>
+      <button class="btn btn-ghost btn-sm" type="submit"><span class="button-label">Python packages</span></button>
+    </form>
+    <form method="post" action="{{ url_for('run_scan') }}" data-scan-form>
+      <input type="hidden" name="scan_mode" value="{{ scan.scan_mode }}">
+      <button class="btn btn-primary btn-sm" type="submit">
+        <span class="button-label">Rescan localhost</span>
+        <span class="btn-arrow" aria-hidden="true">↗</span>
+      </button>
+    </form>
   </div>
 </section>
 
-<p class="scan-snapshot" data-reveal><strong>Saved scan:</strong> these counts describe the time shown above. After any change, use <strong>Rescan localhost</strong> or the automatic test cleanup button to create a new verification result.</p>
+<p class="scan-snapshot" data-reveal><strong>Saved result.</strong> These counts describe {{ scan.timestamp }}. After any change, run a new scan or use the automatic test cleanup to create fresh evidence.</p>
 
 {% if inspection_result %}
-<section class="command-execution {% if inspection_result.error %}is-error{% endif %}" data-reveal>
-  <div><span class="execution-label">{% if inspection_result.error %}PowerShell check failed{% else %}PowerShell check completed{% endif %}</span><strong>Port {{ inspection_result.port }}</strong><p><code>{{ inspection_result.command }}</code></p></div>
-  <pre>{% if inspection_result.error %}{{ inspection_result.error }}{% else %}{{ inspection_result.output }}{% endif %}</pre>
+<section class="console {% if inspection_result.error %}console--error{% endif %}" data-reveal>
+  <header class="console-head">
+    <div class="console-headline">
+      <span class="console-label {% if inspection_result.error %}console-label--bad{% endif %}">
+        {% if inspection_result.error %}PowerShell check failed{% else %}PowerShell check completed{% endif %}
+      </span>
+      <span class="console-context">port {{ inspection_result.port }}</span>
+    </div>
+    <a class="console-dismiss" href="{{ url_for('scan_detail', scan_id=scan.id) }}">Dismiss</a>
+  </header>
+  <pre class="console-body {% if inspection_result.error %}console-body--error{% endif %}">{% if inspection_result.error %}{{ inspection_result.error }}{% else %}{{ inspection_result.output }}{% endif %}</pre>
 </section>
 {% endif %}
 
 {% if python_audit_result %}
-<section class="python-audit {% if python_audit_result.error %}is-error{% endif %}" data-reveal>
-  <div class="python-audit-head"><div><span class="execution-label">{% if python_audit_result.error %}Python check failed{% else %}Read-only Python dependency check{% endif %}</span><h2>Package update decisions.</h2><p>This checks the Python interpreter that runs Nmap Guardian. It does not install, patch, or change any package automatically.</p></div><code>{{ python_audit_result.interpreter }}</code></div>
+<section class="console {% if python_audit_result.error %}console--error{% endif %}" data-reveal>
+  <div class="audit-head">
+    <div>
+      <span class="console-label {% if python_audit_result.error %}console-label--bad{% endif %}">
+        {% if python_audit_result.error %}Python check failed{% else %}Read-only dependency check{% endif %}
+      </span>
+      <h2>Package update decisions.</h2>
+      <p>Checks the interpreter that runs Nmap Guardian. Nothing is installed, patched, or changed automatically.</p>
+    </div>
+    <div class="audit-side">
+      <code title="{{ python_audit_result.interpreter }}">{{ python_audit_result.interpreter }}</code>
+      <a class="console-dismiss" href="{{ url_for('scan_detail', scan_id=scan.id) }}">Dismiss</a>
+    </div>
+  </div>
   {% if python_audit_result.error %}
-  <p class="python-audit-error">{{ python_audit_result.error }}</p>
+  <p class="audit-note console-body--error">{{ python_audit_result.error }}</p>
   {% elif python_audit_result.packages %}
-  <p class="python-audit-note">Out-of-date packages found: {{ python_audit_result.packages|length }}. Update only packages you understand, preferably in the relevant project's virtual environment.</p>
+  <p class="audit-note">Out-of-date packages: {{ python_audit_result.packages|length }}. Update only what you understand, inside the project virtual environment.</p>
   <div class="package-list">
-  {% for package in python_audit_result.packages %}
-    <article class="package-row"><div><strong>{{ package.name }}</strong><span>{{ package.current }} <b>→</b> {{ package.latest }}</span></div>{% if package.upgrade %}<div class="package-command"><code>{{ package.upgrade }}</code><button type="button" class="copy-command" data-copy-command="{{ package.upgrade }}">Copy update</button></div>{% else %}<small>Use the package manager for this dependency.</small>{% endif %}</article>
-  {% endfor %}
+    {% for package in python_audit_result.packages %}
+    <article class="package-row">
+      <div class="package-name">
+        <strong>{{ package.name }}</strong>
+        <span class="package-ver">{{ package.current }} <b>→</b> {{ package.latest }}</span>
+      </div>
+      {% if package.upgrade %}
+      <div class="package-cmd">
+        <code title="{{ package.upgrade }}">{{ package.upgrade }}</code>
+        <button type="button" class="chip-button" data-copy-command="{{ package.upgrade }}">Copy</button>
+      </div>
+      {% else %}
+      <small>Use the package manager for this dependency.</small>
+      {% endif %}
+    </article>
+    {% endfor %}
   </div>
   {% else %}
-  <p class="python-audit-note is-clear">No out-of-date packages were reported for this Python interpreter.</p>
+  <p class="audit-note is-clear">No out-of-date packages were reported for this interpreter.</p>
   {% endif %}
 </section>
 {% endif %}
 
 {% if windows_update_result %}
-<section class="system-update {% if windows_update_result.error %}is-error{% endif %}" data-reveal>
-  <div class="system-update-head"><div><span class="execution-label">{% if windows_update_result.error %}Windows update check failed{% else %}Read-only Windows update evidence{% endif %}</span><h2>Windows service patch status.</h2><p>This checks the Windows Update service and recent installed updates. It does not download or install an update.</p></div><code>{{ windows_update_result.command }}</code></div>
+<section class="console {% if windows_update_result.error %}console--error{% endif %}" data-reveal>
+  <header class="console-head">
+    <div class="console-headline">
+      <span class="console-label {% if windows_update_result.error %}console-label--bad{% endif %}">
+        {% if windows_update_result.error %}Windows update check failed{% else %}Read-only Windows update evidence{% endif %}
+      </span>
+      <span class="console-context">wuauserv</span>
+    </div>
+    <a class="console-dismiss" href="{{ url_for('scan_detail', scan_id=scan.id) }}">Dismiss</a>
+  </header>
   {% if windows_update_result.error %}
-  <p class="python-audit-error">{{ windows_update_result.error }}</p>
+  <pre class="console-body console-body--error">{{ windows_update_result.error }}</pre>
   {% else %}
-  <div class="update-facts"><div><span>Windows Update service</span><strong>{{ windows_update_result.status.serviceStatus }}</strong></div><div><span>Startup type</span><strong>{{ windows_update_result.status.startupType }}</strong></div><div><span>Next decision</span><strong>Open Windows Update and check online</strong></div></div>
-  <p class="system-update-note">This is evidence of installed updates, not proof that every vendor application is fully patched. For a specific non-Windows program, use its vendor updater after identifying the process and version.</p>
-  {% if windows_update_result.status.hotfixes %}
-  <div class="hotfix-list"><span>Recent installed Windows updates</span>{% for hotfix in windows_update_result.status.hotfixes %}<div><code>{{ hotfix.id }}</code><span>{{ hotfix.description }} · {{ hotfix.installedOn }}</span></div>{% endfor %}</div>
-  {% endif %}
+  <div class="console-facts">
+    <div class="fact"><span>Update service</span><strong>{{ windows_update_result.status.serviceStatus }}</strong></div>
+    <div class="fact"><span>Startup type</span><strong>{{ windows_update_result.status.startupType }}</strong></div>
+    <div class="fact"><span>Next decision</span><strong>Check Windows Update online</strong></div>
+  </div>
+  <div class="hotfix-list">
+    <span>Recent installed updates</span>
+    {% if windows_update_result.status.hotfixes %}
+    {% for hotfix in windows_update_result.status.hotfixes %}
+    <div><code>{{ hotfix.id }}</code><span>{{ hotfix.description }} · {{ hotfix.installedOn }}</span></div>
+    {% endfor %}
+    {% else %}
+    <div><span>No update history was returned for this machine.</span></div>
+    {% endif %}
+  </div>
+  <p class="audit-note">Evidence of installed updates, not proof that every application is patched. For a specific program, use its vendor updater after identifying the process and version.</p>
   {% endif %}
 </section>
 {% endif %}
@@ -64,52 +131,75 @@
 {% if scan.get('remediation_result') %}
 <section class="remediation-result" data-reveal>
   <span class="remediation-status">Verified</span>
-  <div><strong>Port {{ scan.remediation_result.port }} test cleanup completed.</strong><p>{{ scan.remediation_result.message }} Process: {{ scan.remediation_result.process }} (PID {{ scan.remediation_result.pid }}).</p></div>
+  <div>
+    <strong>Port {{ scan.remediation_result.port }} test cleanup completed.</strong>
+    <p>{{ scan.remediation_result.message }} Process: {{ scan.remediation_result.process }} (PID {{ scan.remediation_result.pid }}).</p>
+  </div>
 </section>
 {% endif %}
 
 {% set changes = scan.get('changes', {}) %}
 {% if changes.get('previous_scan') %}
-<section class="comparison" data-reveal>
-  <div class="change-open"><span>Newly open</span><strong>{% if changes.opened %}{{ changes.opened|join(', ') }}{% else %}None{% endif %}</strong></div>
-  <div class="change-closed"><span>Newly closed</span><strong>{% if changes.closed %}{{ changes.closed|join(', ') }}{% else %}None{% endif %}</strong></div>
-  <div><span>Compared with</span><strong>{{ changes.previous_scan.timestamp }}</strong></div>
+<section class="compare" data-reveal aria-label="Changes since the previous scan">
+  <div class="compare-cell is-open">
+    <span>Newly open</span>
+    <strong>{% if changes.opened %}{{ changes.opened|join(', ') }}{% else %}None{% endif %}</strong>
+  </div>
+  <div class="compare-cell is-closed">
+    <span>Newly closed</span>
+    <strong>{% if changes.closed %}{{ changes.closed|join(', ') }}{% else %}None{% endif %}</strong>
+  </div>
+  <div class="compare-cell">
+    <span>Compared with</span>
+    <strong>{{ changes.previous_scan.timestamp }}</strong>
+  </div>
 </section>
 {% endif %}
 
-<section class="scan-status-panel" data-reveal>
-  <div class="score-orbit score-orbit-small" style="--score: {{ scan.score.value }}" role="img" aria-label="Exposure score {{ scan.score.value }} out of 100"><div class="score-core"><span>Score</span><strong>{{ scan.score.value }}</strong><small>/100</small></div></div>
-  <div><p class="panel-kicker">Exposure priority</p><h2>{{ scan.score.label }}</h2><p>Minus 12 points per Review finding and 35 points per Danger finding. This is a prioritization aid, not a vulnerability verdict.</p></div>
-  <div class="score-counts"><span>Good <strong>{{ scan.score.counts.Good }}</strong></span><span>Review <strong>{{ scan.score.counts.Review }}</strong></span><span>Danger <strong>{{ scan.score.counts.Danger }}</strong></span></div>
-</section>
-
-<section class="section-heading services-heading" data-reveal>
-  <div>
-    <p class="eyebrow">Local Service Surface</p>
-    <h2>{{ scan.services|length }} Detected Listening Service(s)</h2>
+{% set tone = 'good' if scan.score.label == 'Controlled' else ('warn' if scan.score.label == 'Needs review' else 'bad') %}
+<section class="posture" data-reveal>
+  <div class="score" data-tone="{{ tone }}">
+    <div class="score-ring" data-tone="{{ tone }}" style="--score: {{ scan.score.value }}" role="img" aria-label="Exposure score {{ scan.score.value }} out of 100. {{ scan.score.label }}.">
+      <div class="score-core"><strong>{{ scan.score.value }}</strong><span>/100</span></div>
+    </div>
+    <p class="score-verdict"><i class="dot" aria-hidden="true"></i>{{ scan.score.label }}</p>
+  </div>
+  <div class="posture-copy">
+    <p class="panel-kicker">Exposure priority</p>
+    <h3>{{ scan.services|length }} listening service{{ '' if scan.services|length == 1 else 's' }} on this machine.</h3>
+    <p>Minus 12 points per Review finding and 35 per Danger finding. Use it to order the work, not to claim a vulnerability.</p>
+  </div>
+  <div class="stat-row" role="list">
+    <div class="stat" role="listitem"><span>Good</span><strong>{{ scan.score.counts.Good }}</strong><small>approved</small></div>
+    <div class="stat stat--warn" role="listitem"><span>Review</span><strong>{{ scan.score.counts.Review }}</strong><small>unapproved</small></div>
+    <div class="stat stat--bad" role="listitem"><span>Danger</span><strong>{{ scan.score.counts.Danger }}</strong><small>protected</small></div>
   </div>
 </section>
 
+<div class="section-head" data-reveal>
+  <div>
+    <p class="eyebrow">Service surface</p>
+    <h2>Detected listeners</h2>
+  </div>
+</div>
+
 {% if scan.services %}
-<div class="finding-list" data-reveal>
+<div class="findings" data-reveal>
   {% for service in scan.services %}
-  <article class="finding-card finding-{{ service.level|lower }}">
-    <!-- Card Main Row -->
-    <div class="finding-header">
-      <!-- Port badge -->
-      <div class="port-badge">
+  {% set level = service.level|lower %}
+  <article class="finding finding--{{ level }}" data-finding>
+    <div class="finding-row">
+      <div class="finding-port">
         <span class="port-num">{{ service.port }}</span>
         <span class="port-proto">{{ service.protocol|upper }}</span>
       </div>
 
-      <!-- Service Info & Assessment -->
-      <div class="service-meta">
-        <div class="service-primary-row">
-          <strong class="service-name">{{ service.service }}</strong>
-          {% if service.details and service.details != 'No extra version details' and service.details != 'No version information returned' and service.details != 'No extra version information' %}
-          <span class="service-version-tag">{{ service.details }}</span>
+      <div class="finding-main">
+        <div class="finding-title">
+          <span class="service-name">{{ service.service }}</span>
+          {% if service.details and service.details not in ['No extra version details', 'No version information returned', 'No extra version information'] %}
+          <span class="version-tag">{{ service.details }}</span>
           {% endif %}
-          
           {% if service.owner %}
           <span class="owner-tag" title="Bound to {{ service.owner.address }}">
             <span class="owner-pid">PID {{ service.owner.pid }}</span>
@@ -117,153 +207,180 @@
           </span>
           {% endif %}
         </div>
-        <p class="service-reason">{{ service.reason }}</p>
+        <p class="finding-reason" title="{{ service.reason }}">{{ service.reason }}</p>
       </div>
 
-      <!-- Risk Badge & CVE Pill -->
-      <div class="status-tags">
-        <span class="status-badge status-{{ service.level|lower }}">{{ service.level }}</span>
+      <div class="finding-tags">
+        <span class="status-pill status-pill--{{ level }}">{{ service.level }}</span>
         {% if service.cve %}
-        <span class="cve-badge cve-{{ service.cve.severity|lower }}" title="{{ service.cve.name }}: {{ service.cve.summary }}">
-          <span class="cve-dot"></span>
-          {{ service.cve.cve_id }}
-          <span class="cve-score">{{ service.cve.severity }}</span>
+        <span class="advisory-pill" title="{{ service.cve.name }}. {{ service.cve.summary }}">
+          {{ service.cve.cve_id }}<span class="cvss">{{ service.cve.cvss }}</span>
         </span>
         {% endif %}
       </div>
 
-      <!-- Action Buttons -->
       <div class="finding-actions">
         {% if service.remediation and service.remediation.auto_stop %}
-        <form class="inline-stop-form" method="post" action="{{ url_for('remediate_test_process', scan_id=scan.id, port=service.port) }}" onsubmit="return confirm('Stop test server on port {{ service.port }}?');">
-          <button class="btn-stop-test" type="submit" title="Kill test server and re-verify">
-            <span class="btn-dot-red"></span> Stop Server
+        <form method="post" action="{{ url_for('remediate_test_process', scan_id=scan.id, port=service.port) }}" data-stop-form onsubmit="return confirm('Stop the test server on port {{ service.port }} and re-scan?');">
+          <button class="btn btn-danger btn-sm" type="submit">
+            <span class="button-label">Stop server</span>
           </button>
         </form>
         {% endif %}
-        
-        <button type="button" class="btn-toggle-remediation" onclick="this.closest('.finding-card').classList.toggle('is-expanded')" aria-label="Toggle remediation drawer">
+        <button type="button" class="drawer-toggle" aria-expanded="false" aria-controls="drawer-{{ scan.id }}-{{ service.port }}">
           <span class="toggle-label">Remediation</span>
-          <span class="toggle-icon">▾</span>
+          <span class="chevron" aria-hidden="true"></span>
         </button>
       </div>
     </div>
 
-    <!-- Expandable Remediation Drawer -->
-    <div class="finding-drawer">
-      <div class="drawer-content">
-        
-        <!-- Left: Action Guidance & CVE Alert -->
-        <div class="drawer-guidance">
-          <div class="guidance-box">
-            <span class="drawer-kicker">Recommended Next Step</span>
-            <p class="guidance-text">{{ service.action }}</p>
-          </div>
-
-          {% if service.cve %}
-          <div class="cve-callout cve-callout-{{ service.cve.severity|lower }}">
-            <div class="cve-callout-header">
-              <span class="cve-id-badge">{{ service.cve.cve_id }}</span>
-              <span class="cve-cvss-badge">CVSS {{ service.cve.cvss }} · {{ service.cve.severity }}</span>
+    <div class="finding-drawer" id="drawer-{{ scan.id }}-{{ service.port }}">
+      <div class="drawer-inner">
+        <div class="drawer-content">
+          <div class="drawer-guidance">
+            <div class="guidance-box">
+              <span class="drawer-kicker">Recommended next step</span>
+              <p class="guidance-text">{{ service.action }}</p>
             </div>
-            <strong class="cve-callout-title">{{ service.cve.name }}</strong>
-            <p class="cve-callout-desc">{{ service.cve.summary }}</p>
-          </div>
-          {% endif %}
 
-          {% if service.owner and service.owner.services %}
-          <div class="service-owner-detail">
-            <span>Windows Service(s):</span> <code>{{ service.owner.services }}</code>
+            {% if service.decision and service.decision.steps %}
+            <ol class="decision-steps">
+              {% for step in service.decision.steps %}
+              <li>{{ step }}</li>
+              {% endfor %}
+            </ol>
+            {% endif %}
+
+            {% if service.cve %}
+            <div class="cve-callout">
+              <div class="cve-callout-head">
+                <span class="cve-id">{{ service.cve.cve_id }}</span>
+                <span class="cve-meta">CVSS {{ service.cve.cvss }} · {{ service.cve.severity }}</span>
+              </div>
+              <strong class="cve-title">{{ service.cve.name }}</strong>
+              <p class="cve-desc">{{ service.cve.summary }}</p>
+              <p class="cve-note">Heuristic match from the port and service banner. Confirm it with a version or plugin check before acting on it.</p>
+            </div>
+            {% endif %}
+
+            {% if service.owner and service.owner.services %}
+            <p class="owner-detail">Windows service: <code>{{ service.owner.services }}</code></p>
+            {% endif %}
           </div>
-          {% endif %}
+
+          <div class="drawer-commands">
+            <span class="drawer-kicker">Remediation commands</span>
+            <div class="cmd-list">
+              {% if service.cve and service.remediation.update_cmd %}
+              <div class="cmd">
+                <div class="cmd-head">
+                  <span class="cmd-label env-linux">Linux · update</span>
+                  <button type="button" class="cmd-copy" data-copy-command="{{ service.remediation.update_cmd }}">Copy</button>
+                </div>
+                <code class="cmd-code cmd-code--patch">{{ service.remediation.update_cmd }}</code>
+              </div>
+              {% endif %}
+
+              {% if service.remediation.stop %}
+              <div class="cmd">
+                <div class="cmd-head">
+                  <span class="cmd-label env-win">PowerShell · stop process</span>
+                  <button type="button" class="cmd-copy" data-copy-command="{{ service.remediation.stop }}">Copy</button>
+                </div>
+                <code class="cmd-code">{{ service.remediation.stop }}</code>
+              </div>
+              {% endif %}
+
+              {% if service.remediation.linux_stop %}
+              <div class="cmd">
+                <div class="cmd-head">
+                  <span class="cmd-label env-linux">Linux · stop service</span>
+                  <button type="button" class="cmd-copy" data-copy-command="{{ service.remediation.linux_stop }}">Copy</button>
+                </div>
+                <code class="cmd-code">{{ service.remediation.linux_stop }}</code>
+              </div>
+              {% endif %}
+
+              {% if service.remediation.firewall %}
+              <div class="cmd">
+                <div class="cmd-head">
+                  <span class="cmd-label env-win">Windows · block inbound</span>
+                  <button type="button" class="cmd-copy" data-copy-command="{{ service.remediation.firewall }}">Copy</button>
+                </div>
+                <code class="cmd-code">{{ service.remediation.firewall }}</code>
+              </div>
+              {% endif %}
+
+              {% if service.remediation.inspect %}
+              <div class="cmd">
+                <div class="cmd-head">
+                  <span class="cmd-label env-win">PowerShell · inspect listener</span>
+                  <button type="button" class="cmd-copy" data-copy-command="{{ service.remediation.inspect }}">Copy</button>
+                </div>
+                <code class="cmd-code">{{ service.remediation.inspect }}</code>
+              </div>
+              {% endif %}
+            </div>
+
+            <form class="inspect-form" method="post" action="{{ url_for('inspect_port', scan_id=scan.id, port=service.port) }}" data-inspection-form>
+              <button class="btn btn-ghost btn-sm btn-block" type="submit">
+                <span class="button-label">Inspect owner in PowerShell</span>
+              </button>
+            </form>
+            <p class="panel-note">{{ service.remediation.notice }}</p>
+          </div>
         </div>
-
-        <!-- Right: Copyable Shell Commands -->
-        <div class="drawer-commands">
-          <span class="drawer-kicker">Remediation Commands</span>
-
-          {% if service.cve and service.remediation.update_cmd %}
-          <div class="cmd-tile cmd-tile-patch">
-            <div class="cmd-header">
-              <span class="cmd-env-tag env-linux">Linux / CVE Patch</span>
-              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.update_cmd }}">Copy</button>
-            </div>
-            <code>{{ service.remediation.update_cmd }}</code>
-          </div>
-          {% endif %}
-
-          {% if service.remediation.stop %}
-          <div class="cmd-tile">
-            <div class="cmd-header">
-              <span class="cmd-env-tag env-win">PowerShell (Stop Process)</span>
-              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.stop }}">Copy</button>
-            </div>
-            <code>{{ service.remediation.stop }}</code>
-          </div>
-          {% endif %}
-
-          {% if service.remediation.linux_stop %}
-          <div class="cmd-tile">
-            <div class="cmd-header">
-              <span class="cmd-env-tag env-linux">Linux Sudo (Stop Service)</span>
-              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.linux_stop }}">Copy</button>
-            </div>
-            <code>{{ service.remediation.linux_stop }}</code>
-          </div>
-          {% endif %}
-
-          {% if service.remediation.firewall %}
-          <div class="cmd-tile">
-            <div class="cmd-header">
-              <span class="cmd-env-tag env-win">Windows Firewall (Block Inbound)</span>
-              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.firewall }}">Copy</button>
-            </div>
-            <code>{{ service.remediation.firewall }}</code>
-          </div>
-          {% endif %}
-
-          {% if service.remediation.inspect %}
-          <div class="cmd-tile">
-            <div class="cmd-header">
-              <span class="cmd-env-tag env-win">PowerShell (Inspect Listener)</span>
-              <button type="button" class="btn-copy" data-copy-command="{{ service.remediation.inspect }}">Copy</button>
-            </div>
-            <code>{{ service.remediation.inspect }}</code>
-          </div>
-          {% endif %}
-        </div>
-
       </div>
     </div>
   </article>
   {% endfor %}
 </div>
 {% else %}
-<section class="empty-state">
+<section class="empty">
+  <p class="eyebrow">Clean surface</p>
   <h2>No open TCP services detected.</h2>
-  <p>This is a clean baseline. Start a local server (e.g. Python on port 8000) and scan again to verify exposure detection.</p>
+  <p>That is a clean baseline. Start a local server on port 8000 and scan again to verify detection, then close it and scan once more to prove the change.</p>
+  <div class="empty-cmd">
+    <code>python -m http.server 8000 --bind 127.0.0.1</code>
+    <button class="chip-button" type="button" data-copy-command="python -m http.server 8000 --bind 127.0.0.1">Copy</button>
+  </div>
 </section>
 {% endif %}
 
 {% if scan.services %}
 <section class="baseline-editor" data-reveal>
-  <div><p class="eyebrow">Baseline management</p><h2>Approve expected local services.</h2><p>Select only ports you understand and expect to remain open. This records an expected service; it does not close the port. The next scan will classify it as Good.</p></div>
+  <div>
+    <p class="eyebrow">Baseline management</p>
+    <h2>Approve expected local services.</h2>
+    <p>Select only ports you understand and expect to remain open. This records an expectation, it does not close the port. The next scan will classify those ports as Good.</p>
+  </div>
   <form method="post" action="{{ url_for('update_baseline') }}">
     <input type="hidden" name="source_scan" value="{{ scan.id }}">
-    <div class="port-checkboxes">
-    {% for service in scan.services %}
-      <label><input type="checkbox" name="approved_ports" value="{{ service.port }}" {% if service.port in baseline.approved_ports %}checked{% endif %}><span>{{ service.port }}</span> {{ service.service }}</label>
-    {% endfor %}
+    <div class="port-checks">
+      {% for service in scan.services %}
+      <label class="port-chip">
+        <input type="checkbox" name="approved_ports" value="{{ service.port }}" {% if service.port in baseline.approved_ports %}checked{% endif %}>
+        <span class="chip-box" aria-hidden="true"></span>
+        <span class="chip-port">{{ service.port }}</span>
+        <span class="chip-name">{{ service.service }}</span>
+      </label>
+      {% endfor %}
     </div>
-    <button class="secondary" type="submit">Save reviewed baseline</button>
+    <button class="btn btn-ghost" type="submit">Save reviewed baseline</button>
   </form>
 </section>
 {% endif %}
 
-<section class="technical-details">
-  <h2>Reproducibility details</h2>
-  <p><strong>Command:</strong> <code>{{ scan.command }}</code></p>
-  <p><strong>Scanner:</strong> {{ scan.nmap_version }}</p>
-  <details><summary>Raw Nmap XML evidence</summary><pre>{{ scan.raw_xml }}</pre></details>
+<section class="technical" aria-labelledby="technical-title">
+  <h2 id="technical-title">Reproducibility</h2>
+  <dl>
+    <div class="tech-row"><dt>Command</dt><dd><code>{{ scan.command }}</code></dd></div>
+    <div class="tech-row"><dt>Scanner</dt><dd>{{ scan.nmap_version }}</dd></div>
+    <div class="tech-row"><dt>Scope</dt><dd>{{ scan.scan_scope }}</dd></div>
+  </dl>
+  <details class="raw-details">
+    <summary>Raw Nmap XML evidence</summary>
+    <pre class="raw-xml">{{ scan.raw_xml }}</pre>
+  </details>
 </section>
 {% endblock %}

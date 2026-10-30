@@ -15,7 +15,18 @@ Nmap Guardian is a local-only Flask dashboard for the **Cartographie et services
 - Windows process and PID association for detected local listening ports.
 - Copyable PowerShell command plans, a one-click read-only **Inspect in PowerShell** owner/service check, and stop-and-verify for a verified Python/Node test server on ports 3000, 8000, or 8080.
 - Read-only Python dependency check that lists outdated packages and presents copyable update commands. It never upgrades packages automatically.
+- Read-only Windows Update evidence check (service state, startup type, recent hotfixes). It never downloads or installs updates.
 - Printable HTML report.
+
+## Interface
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+![Findings with the remediation drawer open](docs/screenshots/scan-drawer.png)
+
+![Scan page on a 390 px viewport](docs/screenshots/scan-mobile.png)
+
+The interface uses a cold graphite instrument-panel language: hairline geometry, a single azure signal accent, semantic status colors, Geist and Geist Mono, and Motion for entry choreography. Every panel has a defined empty, loading, and error state, and the whole layout collapses to a single column at 390 px.
 
 ## Safety model
 
@@ -48,4 +59,4 @@ python -m http.server 8000 --bind 127.0.0.1
 
 ## Technology
 
-Python, Flask, Nmap, PowerShell `Get-NetTCPConnection`, JSON, GSAP, and Motion.
+Python, Flask, Nmap, PowerShell `Get-NetTCPConnection`, JSON, Geist and Geist Mono, and Motion.

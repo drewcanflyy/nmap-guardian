@@ -38,9 +38,9 @@ SCAN_PROFILES = {
         "timeout": 240,
     },
     "vuln": {
-        "arguments": ["-sV", "--version-all"],
-        "label": "CVE Vulnerability scan",
-        "scope": "Detailed service banners with automated CVE analysis",
+        "arguments": [],
+        "label": "Detailed service version scan",
+        "scope": "Full version detection on the common TCP ports. Banners are not exploit checks.",
         "timeout": 120,
     },
 }

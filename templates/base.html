@@ -3,34 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#070b12">
+  <meta name="theme-color" content="#08090b">
+  <meta name="description" content="Nmap Guardian is a local-only dashboard for inventorying exposed services on 127.0.0.1, explaining unexpected ports, and verifying every change with a new scan.">
   <title>{% block title %}Nmap Guardian{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script>
+    document.documentElement.classList.add("js");
+    // Safety net: if the motion module never finishes, never leave content hidden.
+    window.setTimeout(function () {
+      if (!document.documentElement.classList.contains("has-motion")) return;
+      document
+        .querySelectorAll("[data-reveal]:not(.is-in), [data-intro]:not(.is-in), [data-intro-card]:not(.is-in)")
+        .forEach(function (element) { element.classList.add("is-in"); });
+    }, 2600);
+  </script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
+  <div class="grain" aria-hidden="true"></div>
   <a class="skip-link" href="#main-content">Skip to content</a>
-  <header class="topbar">
-    <a class="brand" href="{{ url_for('index') }}" aria-label="Nmap Guardian home">
-      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span>Nmap Guardian</span>
-    </a>
-    <nav aria-label="Primary navigation">
-      <a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}aria-current="page"{% endif %}>Overview</a>
-      <a href="{{ url_for('guidance') }}" {% if request.endpoint == 'guidance' %}aria-current="page"{% endif %}>Playbook</a>
-      <span class="scope"><i class="scope-pulse" aria-hidden="true"></i> Localhost only</span>
-    </nav>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="{{ url_for('index') }}" aria-label="Nmap Guardian home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="brand-name">Nmap <span>Guardian</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a class="nav-link" href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}aria-current="page"{% endif %}>Overview</a>
+        <a class="nav-link" href="{{ url_for('guidance') }}" {% if request.endpoint == 'guidance' %}aria-current="page"{% endif %}>Playbook</a>
+      </nav>
+      <div class="header-status">
+        <span class="scope-pill"><i class="scope-dot" aria-hidden="true"></i> Localhost only</span>
+      </div>
+    </div>
   </header>
+
   <main id="main-content" class="page">{% block content %}{% endblock %}</main>
-  <section id="scan-progress" class="scan-progress" hidden role="status" aria-live="polite" aria-atomic="true">
-    <div class="scan-progress-head"><span>Estimated scan progress</span><strong data-scan-progress-value>0%</strong></div>
-    <div class="scan-progress-track" role="progressbar" aria-label="Estimated local scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-scan-progress-fill></span></div>
-    <p data-scan-progress-message>Preparing the local scanner…</p>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>Nmap Guardian · local-only exposure inventory · coursework P2</span>
+      <span>Observations, not verdicts. Target <code>127.0.0.1</code>.</span>
+    </div>
+  </footer>
+
+  <section id="scan-progress" class="scan-console" hidden role="status" aria-live="polite" aria-atomic="true">
+    <div class="scan-console-head">
+      <span class="scan-console-title"><i class="status-dot is-online" aria-hidden="true"></i> Local scan</span>
+      <strong class="scan-console-value" data-scan-progress-value>0%</strong>
+    </div>
+    <div class="scan-console-track" role="progressbar" aria-label="Estimated local scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <span data-scan-progress-fill></span>
+    </div>
+    <p class="scan-console-msg" data-scan-progress-message>Preparing the local scanner.</p>
   </section>
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js" defer></script>
+
   <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

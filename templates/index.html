@@ -1,85 +1,139 @@
 {% extends "base.html" %}
-{% block body_class %}dashboard-page{% endblock %}
+{% block body_class %}page-dashboard{% endblock %}
 {% block content %}
-<section class="dashboard-hero" data-intro>
-  <div class="hero-copy">
+<section class="hero">
+  <div class="hero-copy" data-intro>
     <p class="eyebrow">Local exposure monitor</p>
-    <h1>Know what your machine is <span>showing.</span></h1>
+    <h1>Know what your machine is <em>showing</em>.</h1>
     <p class="lede">An authorized, local-first workflow to inspect services, reduce unnecessary exposure, and keep evidence of every change.</p>
-    <div class="hero-facts" aria-label="Dashboard scope">
-      <span>Target <strong>127.0.0.1</strong></span>
-      <span>Mode <strong>Service inventory</strong></span>
-    </div>
+    <dl class="hero-meta">
+      <div><dt>Target</dt><dd>127.0.0.1</dd></div>
+      <div><dt>Mode</dt><dd>Service inventory</dd></div>
+      <div><dt>Transport</dt><dd>TCP</dd></div>
+    </dl>
   </div>
-  <section class="scan-panel scan-command" aria-labelledby="scan-control-title" data-intro-card>
-    <div class="scan-panel-head">
-      <div>
-        <span class="status-indicator {% if nmap_available %}is-ready{% else %}is-unavailable{% endif %}" aria-hidden="true"></span>
-        <p class="panel-kicker">Scanner status</p>
+
+  <div class="panel-shell" data-intro-card>
+    <section class="panel-core scan-panel" aria-labelledby="scan-control-title">
+      <div class="panel-head">
+        <span class="status-line">
+          <i class="status-dot {{ 'is-online' if nmap_available else 'is-offline' }}" aria-hidden="true"></i>
+          <span class="panel-kicker">Scanner</span>
+        </span>
+        <span class="state-pill {{ 'state-ok' if nmap_available else 'state-bad' }}">{{ 'Online' if nmap_available else 'Unavailable' }}</span>
       </div>
-      <span class="scanner-state {% if nmap_available %}status-good{% else %}status-danger{% endif %}">{% if nmap_available %}Online{% else %}Unavailable{% endif %}</span>
-    </div>
-    <h2 id="scan-control-title">Run a local inspection</h2>
-    <p class="scan-version">{{ nmap_version }}</p>
-    <form class="scan-actions" method="post" action="{{ url_for('run_scan') }}" data-scan-form>
-      <button class="primary scan-button" type="submit" name="scan_mode" value="quick" {% if not nmap_available %}disabled{% endif %}>
-        <span class="button-label">Scan localhost</span><span class="button-arrow" aria-hidden="true">↗</span>
-      </button>
-      <button class="secondary" type="submit" name="scan_mode" value="vuln" {% if not nmap_available %}disabled{% endif %}>CVE Vulnerability scan</button>
-      <button class="secondary" type="submit" name="scan_mode" value="deep" {% if not nmap_available %}disabled{% endif %}>Deep scan all TCP ports</button>
-    </form>
-    <p class="microcopy"><span>Standard command</span><code>nmap -sV --version-light -oX - 127.0.0.1</code></p>
-    <p class="deep-scan-note">The deep option checks all local TCP ports. It can take up to four minutes. UDP is intentionally outside this local coursework scope.</p>
-  </section>
+
+      <h2 id="scan-control-title">Run a local inspection</h2>
+      <p class="scan-version">{{ nmap_version }}</p>
+
+      <form class="scan-actions" method="post" action="{{ url_for('run_scan') }}" data-scan-form>
+        <button class="btn btn-primary btn-block" type="submit" name="scan_mode" value="quick" {% if not nmap_available %}disabled{% endif %}>
+          <span class="button-label">Scan localhost</span>
+          <span class="btn-arrow" aria-hidden="true">↗</span>
+        </button>
+        <div class="scan-actions-row">
+          <button class="btn btn-ghost" type="submit" name="scan_mode" value="vuln" {% if not nmap_available %}disabled{% endif %}>
+            <span class="button-label">Detailed versions</span>
+          </button>
+          <button class="btn btn-ghost" type="submit" name="scan_mode" value="deep" {% if not nmap_available %}disabled{% endif %}>
+            <span class="button-label">All TCP ports</span>
+          </button>
+        </div>
+      </form>
+
+      <div class="command">
+        <span class="command-label">cmd</span>
+        <code>nmap -sV --version-light -oX - 127.0.0.1</code>
+        <button class="chip-button" type="button" data-copy-command="nmap -sV --version-light -oX - 127.0.0.1">Copy</button>
+      </div>
+
+      <p class="panel-note">All TCP ports checks 65,535 local ports and can take up to four minutes. UDP sits outside this coursework scope.</p>
+    </section>
+  </div>
 </section>
 
-<section class="notice safety-notice" data-reveal>
-  <div class="notice-icon" aria-hidden="true">!</div>
-  <div><strong>Safety boundary</strong><span>The target is only localhost. Automatic cleanup is limited to verified Python or Node test servers on ports 3000, 8000, and 8080; Windows core services, firewall rules, and the dashboard itself remain protected.</span></div>
-</section>
+<aside class="boundary" data-reveal>
+  <span class="boundary-tag">Boundary</span>
+  <p>The target is only localhost. Automatic cleanup is limited to verified Python or Node test servers on ports 3000, 8000, and 8080. Windows core services, firewall rules, and the dashboard itself stay protected.</p>
+</aside>
 
 {% if latest %}
-<section class="section-heading latest-heading" data-reveal>
-  <div><p class="eyebrow">Current posture</p><h2>Latest inspection</h2><p class="section-copy">Captured {{ latest.timestamp }} for {{ latest.target }}.</p></div>
-  <a class="text-link arrow-link" href="{{ url_for('scan_detail', scan_id=latest.id) }}">Open scan <span aria-hidden="true">↗</span></a>
-</section>
-<section class="posture-grid" data-reveal>
-  <div class="score-orbit" style="--score: {{ latest.score.value }}" role="img" aria-label="Exposure score {{ latest.score.value }} out of 100, {{ latest.score.label }}">
-    <div class="score-core"><span>Exposure</span><strong>{{ latest.score.value }}</strong><small>/100</small></div>
+{% set tone = 'good' if latest.score.label == 'Controlled' else ('warn' if latest.score.label == 'Needs review' else 'bad') %}
+<div class="section-head" data-reveal>
+  <div>
+    <p class="eyebrow">Current posture</p>
+    <h2>Latest inspection</h2>
+    <p class="section-copy">Captured {{ latest.timestamp }} against {{ latest.target }}. <a class="inline-link" href="{{ url_for('scan_detail', scan_id=latest.id) }}">Open scan ↗</a></p>
   </div>
-  <div class="posture-summary">
-    <p class="panel-kicker">{{ latest.score.label }}</p>
-    <h3>Exposure is measured by the open services you have not approved.</h3>
-    <p>Review findings reduce the score by 12 points. Danger findings reduce it by 35 points.</p>
+</div>
+
+<section class="posture" data-reveal>
+  <div class="score" data-tone="{{ tone }}">
+    <div class="score-ring" data-tone="{{ tone }}" style="--score: {{ latest.score.value }}" role="img" aria-label="Exposure score {{ latest.score.value }} out of 100. {{ latest.score.label }}.">
+      <div class="score-core"><strong>{{ latest.score.value }}</strong><span>/100</span></div>
+    </div>
+    <p class="score-verdict"><i class="dot" aria-hidden="true"></i>{{ latest.score.label }}</p>
   </div>
-  <div class="metric-rail">
-    <article class="metric"><span>Visible</span><strong>{{ latest.services|length }}</strong><small>open services</small></article>
-    <article class="metric metric-danger"><span>Danger</span><strong>{{ latest.services|selectattr('level', 'equalto', 'Danger')|list|length }}</strong><small>need review</small></article>
-    <article class="metric metric-review"><span>Review</span><strong>{{ latest.services|selectattr('level', 'equalto', 'Review')|list|length }}</strong><small>unapproved</small></article>
+  <div class="posture-copy">
+    <p class="panel-kicker">Exposure priority</p>
+    <h3>Every unapproved listener is a decision you have not made yet.</h3>
+    <p>Review findings cost 12 points and Danger findings cost 35. The score orders what to look at first. It is not a vulnerability verdict.</p>
+  </div>
+  <div class="stat-row" role="list">
+    <div class="stat" role="listitem">
+      <span>Visible</span><strong>{{ latest.services|length }}</strong><small>open services</small>
+    </div>
+    <div class="stat stat--bad" role="listitem">
+      <span>Danger</span><strong>{{ latest.services|selectattr('level', 'equalto', 'Danger')|list|length }}</strong><small>need review</small>
+    </div>
+    <div class="stat stat--warn" role="listitem">
+      <span>Review</span><strong>{{ latest.services|selectattr('level', 'equalto', 'Review')|list|length }}</strong><small>unapproved</small>
+    </div>
   </div>
 </section>
 {% else %}
-<section class="empty-state empty-state-feature" data-reveal>
+<section class="empty" data-reveal>
   <p class="eyebrow">No evidence yet</p>
   <h2>Run the first local inspection.</h2>
-  <p>Start a controlled service with <code>python -m http.server 8000 --bind 127.0.0.1</code>, then scan it to create your first evidence record.</p>
+  <p>Start a controlled service, scan it, then close it and scan again. That sequence gives you a before and after you can defend in the report.</p>
+  <div class="empty-cmd">
+    <code>python -m http.server 8000 --bind 127.0.0.1</code>
+    <button class="chip-button" type="button" data-copy-command="python -m http.server 8000 --bind 127.0.0.1">Copy</button>
+  </div>
+  <ol class="empty-steps">
+    <li><b>01</b> Start the test server</li>
+    <li><b>02</b> Scan localhost</li>
+    <li><b>03</b> Stop it and verify</li>
+  </ol>
 </section>
 {% endif %}
 
-<section class="baseline-summary" data-reveal>
-  <div class="baseline-count"><span>Approved</span><strong>{{ baseline.approved_ports|length }}</strong><small>ports</small></div>
-  <div><h2>Baseline is your reference, not an automatic approval.</h2><p>Only expected services should enter it. Revisit the baseline when the machine changes.</p></div>
-  <a class="secondary" href="{{ url_for('guidance') }}">Open playbook <span aria-hidden="true">↗</span></a>
+<section class="baseline-strip" data-reveal>
+  <div class="baseline-count">
+    <strong>{{ baseline.approved_ports|length }}</strong>
+    <span>approved</span>
+  </div>
+  <p>Your baseline is a reference, not an automatic approval. Add only the services you expect to stay open, then revisit it whenever the machine changes.</p>
+  <a class="btn btn-ghost" href="{{ url_for('guidance') }}">Open playbook <span class="btn-arrow" aria-hidden="true">↗</span></a>
 </section>
 
 {% if history %}
-<section class="section-heading history-heading" data-reveal><div><p class="eyebrow">Evidence trail</p><h2>Saved inspections</h2></div></section>
-<div class="history-list" data-reveal>
+<div class="section-head" data-reveal>
+  <div>
+    <p class="eyebrow">Evidence trail</p>
+    <h2>Saved inspections</h2>
+  </div>
+</div>
+<nav class="history" aria-label="Saved inspections" data-reveal>
   {% for item in history %}
-  <a href="{{ url_for('scan_detail', scan_id=item.id) }}" class="history-row">
-    <span class="history-id">{{ item.id }}</span><span>{{ item.timestamp }}</span><span>{{ item.services|length }} service(s)</span><span class="history-arrow" aria-hidden="true">↗</span>
+  <a class="history-row" href="{{ url_for('scan_detail', scan_id=item.id) }}">
+    <span class="history-id">{{ item.id }}</span>
+    <span class="history-time">{{ item.timestamp }}</span>
+    <span class="history-count">{{ item.services|length }} service{{ '' if item.services|length == 1 else 's' }}</span>
+    <span class="history-mode">{{ item.scan_label }}</span>
+    <span class="history-arrow" aria-hidden="true">↗</span>
   </a>
   {% endfor %}
-</div>
+</nav>
 {% endif %}
 {% endblock %}
